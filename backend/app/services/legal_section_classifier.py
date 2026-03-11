@@ -51,6 +51,16 @@ SECTION_RULES = [
     },
 ]
 
+TITLE_CITATION_HINTS = {
+    "Theft": "theft",
+    "Criminal Intimidation": "criminal intimidation",
+    "Cheating": "cheating",
+    "Voluntarily Causing Hurt / Assault": "hurt",
+    "Sexual Harassment / Stalking": "sexual harassment",
+    "Criminal Trespass": "trespass",
+    "Mischief / Property Damage": "mischief",
+}
+
 
 class LegalSectionClassifier:
     def __init__(self, retriever: Retriever, model_name: str | None = None) -> None:
@@ -69,7 +79,11 @@ class LegalSectionClassifier:
             hits = sum(1 for keyword in rule["keywords"] if keyword in lowered)
             if hits == 0:
                 continue
-            section_label = self._resolve_section_label(incident_description, rule["fallback_section"])
+            section_label = self._resolve_section_label(
+                incident_description,
+                rule["fallback_section"],
+                preferred_title=rule["title"],
+            )
             matched.append(
                 FIRSectionSuggestion(
                     section=section_label,
@@ -101,8 +115,14 @@ class LegalSectionClassifier:
         reasoning = " ".join(suggestion.reasoning for suggestion in matched[:3])
         return matched[:3], reasoning
 
-    def _resolve_section_label(self, description: str, fallback: str) -> str:
+    def _resolve_section_label(self, description: str, fallback: str, preferred_title: str | None = None) -> str:
         retrieved = self.retriever.search(description, 5)
+        hint = TITLE_CITATION_HINTS.get(preferred_title or "", "").lower()
+        for item in retrieved:
+            citation = item.get("citation", "")
+            haystack = f"{item.get('title', '')} {citation} {item.get('text', '')}".lower()
+            if hint and hint in haystack and ("BNS" in citation or "Bharatiya Nyaya Sanhita" in citation):
+                return citation
         for item in retrieved:
             citation = item.get("citation", "")
             if "BNS" in citation or "Bharatiya Nyaya Sanhita" in citation:
@@ -144,7 +164,11 @@ class LegalSectionClassifier:
                 continue
             suggestions.append(
                 FIRSectionSuggestion(
-                    section=self._resolve_section_label(incident_description, rule["fallback_section"]),
+                    section=self._resolve_section_label(
+                        incident_description,
+                        rule["fallback_section"],
+                        preferred_title=label,
+                    ),
                     title=label,
                     reasoning=f"Model prediction suggests {label.lower()} based on the legal incident description.",
                     confidence=float(score),

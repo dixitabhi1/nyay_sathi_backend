@@ -504,9 +504,24 @@ button {
   font-size: 0.95rem;
 }
 
+.source-card-header a,
+.source-link-row a {
+  color: var(--copy);
+  text-decoration: none;
+}
+
+.source-card-header a:hover,
+.source-link-row a:hover {
+  text-decoration: underline;
+}
+
 .source-card-header span {
   color: var(--muted);
   text-transform: capitalize;
+}
+
+.source-link-row {
+  margin-top: 12px !important;
 }
 
 .source-title {

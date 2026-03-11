@@ -6,6 +6,7 @@ type SourceDocument = {
   excerpt: string;
   source_type: string;
   score: number;
+  source_url?: string | null;
 };
 
 type ChatResponse = {
@@ -95,6 +96,7 @@ function asSources(value: unknown): SourceDocument[] {
     excerpt: typeof item.excerpt === "string" ? item.excerpt : "",
     source_type: typeof item.source_type === "string" ? item.source_type : "source",
     score: typeof item.score === "number" ? item.score : 0,
+    source_url: typeof item.source_url === "string" ? item.source_url : null,
   }));
 }
 
@@ -115,7 +117,7 @@ function buildDownloadText(module: ModuleKey, content: unknown): string {
       item.scope_warning ? `Warning: ${item.scope_warning}` : "",
       "",
       "Sources:",
-      ...sources.map((source) => `- ${source.citation}: ${source.excerpt}`),
+      ...sources.map((source) => `- ${source.citation}: ${source.excerpt}${source.source_url ? ` (${source.source_url})` : ""}`),
       "",
       `Disclaimer: ${item.disclaimer ?? ""}`,
     ]
@@ -242,11 +244,24 @@ function renderSources(label: string, sources: SourceDocument[]) {
         {sources.map((source) => (
           <article key={`${source.citation}-${source.title}`} className="source-card">
             <div className="source-card-header">
-              <strong>{source.citation}</strong>
+              {source.source_url ? (
+                <a href={source.source_url} target="_blank" rel="noopener noreferrer">
+                  <strong>{source.citation}</strong>
+                </a>
+              ) : (
+                <strong>{source.citation}</strong>
+              )}
               <span>{source.source_type}</span>
             </div>
             <p className="source-title">{source.title}</p>
             <p>{source.excerpt}</p>
+            {source.source_url && (
+              <p className="source-link-row">
+                <a href={source.source_url} target="_blank" rel="noopener noreferrer">
+                  Open official source
+                </a>
+              </p>
+            )}
           </article>
         ))}
       </div>

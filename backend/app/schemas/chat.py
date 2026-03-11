@@ -12,6 +12,7 @@ class SourceDocument(BaseModel):
     excerpt: str
     source_type: str
     score: float
+    source_url: str | None = None
 
 
 class ChatRequest(BaseModel):

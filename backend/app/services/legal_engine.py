@@ -72,6 +72,7 @@ class LegalEngine:
                 excerpt=item["text"][:280],
                 source_type=item.get("source_type", "statute"),
                 score=round(item["score"], 4),
+                source_url=item.get("source_url") or self._default_source_url(item["citation"], item["title"]),
             )
             for item in prioritized_hits
         ]
@@ -306,6 +307,7 @@ class LegalEngine:
                 excerpt=item["text"][:280],
                 source_type=item.get("source_type", "statute"),
                 score=round(item["score"], 4),
+                source_url=item.get("source_url") or self._default_source_url(item["citation"], item["title"]),
             )
             for item in results
         ]
@@ -315,6 +317,18 @@ class LegalEngine:
             f"{source.title} ({source.citation})\n{source.excerpt}"
             for source in sources
         )
+
+    def _default_source_url(self, citation: str, title: str) -> str | None:
+        haystack = f"{citation} {title}".lower()
+        if "bns" in haystack or "bharatiya nyaya sanhita" in haystack:
+            return "https://www.indiacode.nic.in/handle/123456789/20062"
+        if "evidence act" in haystack or "65b" in haystack:
+            return "https://www.indiacode.nic.in/handle/123456789/2187"
+        if "contract act" in haystack:
+            return "https://www.indiacode.nic.in/handle/123456789/2185"
+        if "ipc" in haystack or "penal code" in haystack:
+            return "https://www.indiacode.nic.in/bitstream/123456789/2263/1/A1860-45.pdf"
+        return None
 
     def _parse_generation(self, generated: str) -> dict:
         try:
@@ -337,6 +351,7 @@ class LegalEngine:
                 ),
                 source_type="statute",
                 score=1.0,
+                source_url="https://www.indiacode.nic.in/handle/123456789/20062",
             )
             return ChatResponse(
                 answer=(
