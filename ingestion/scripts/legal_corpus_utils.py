@@ -43,6 +43,18 @@ def normalize_text(text: str) -> str:
     return cleaned.strip()
 
 
+def trim_statute_front_matter(text: str) -> str:
+    marker_candidates = [
+        "BE it enacted by Parliament",
+        "BE it enacted",
+    ]
+    for marker in marker_candidates:
+        position = text.find(marker)
+        if position > 0:
+            return text[position:]
+    return text
+
+
 def detect_language(text: str) -> str:
     if re.search(r"[\u0900-\u097F]", text):
         return "hi"
@@ -148,7 +160,9 @@ def build_statute_chunks(document: dict) -> list[dict]:
                 for subsection_label, subsection_text in subsection_blocks
             ]
         else:
-            citation_suffix = heading if heading.lower().startswith("section") else f"Section Block {section_index}"
+            citation_suffix = f"Section {section_number}" if section_number else (
+                heading if heading.lower().startswith("section") else f"Section Block {section_index}"
+            )
             granular_units = [(citation_suffix, section_text, "statute_section")]
 
         for granular_heading, granular_text, strategy in granular_units:
@@ -202,6 +216,10 @@ def build_judgment_chunks(document: dict) -> list[dict]:
 
 
 def build_document_record(download_row: dict, raw_text: str) -> dict:
+    document_type = download_row.get("document_type", download_row["source_type"])
+    if document_type == "act":
+        raw_text = trim_statute_front_matter(raw_text)
+
     language = download_row.get("language") or detect_language(raw_text)
     source_url = download_row.get("download_url") or download_row.get("source_url") or ""
     document_id = stable_id(download_row["source_id"], source_url or download_row["local_path"])
@@ -213,7 +231,7 @@ def build_document_record(download_row: dict, raw_text: str) -> dict:
         "title": title,
         "citation": citation,
         "source_type": download_row["source_type"],
-        "document_type": download_row.get("document_type", download_row["source_type"]),
+        "document_type": document_type,
         "jurisdiction": download_row.get("jurisdiction", "India"),
         "language": language,
         "source_url": source_url,
