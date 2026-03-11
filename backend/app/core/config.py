@@ -26,7 +26,10 @@ class Settings(BaseSettings):
     database_url: str | None = Field(default=None, alias="DATABASE_URL")
     analytics_db_path: Path = Field(default=ROOT_DIR / "data" / "analytics" / "legal_corpus.duckdb", alias="ANALYTICS_DB_PATH")
 
-    embedding_model_name: str = Field(default="BAAI/bge-m3", alias="EMBEDDING_MODEL_NAME")
+    embedding_model_name: str = Field(
+        default="sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2",
+        alias="EMBEDDING_MODEL_NAME",
+    )
     vector_index_path: Path = Field(default=ROOT_DIR / "data" / "index" / "legal.index", alias="VECTOR_INDEX_PATH")
     vector_metadata_path: Path = Field(default=ROOT_DIR / "data" / "index" / "legal_metadata.json", alias="VECTOR_METADATA_PATH")
     legal_corpus_path: Path = Field(

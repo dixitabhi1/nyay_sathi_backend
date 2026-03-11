@@ -345,7 +345,32 @@ class LegalEngine:
         if not re.search(r"\bhow many\b.*\bsections?\b|\bnumber of sections?\b", normalized):
             return None
 
-        if "bns" in normalized or "bharatiya nyaya sanhita" in normalized:
+        if "bnss" in normalized or "bharatiya nagarik suraksha sanhita" in normalized:
+            source = SourceDocument(
+                title="Bharatiya Nagarik Suraksha Sanhita, 2023",
+                citation="India Code Act No. 46 of 2023",
+                excerpt=(
+                    "In the official India Code text of the Bharatiya Nagarik Suraksha Sanhita, 2023, "
+                    "the statute runs from section 1 to section 531."
+                ),
+                source_type="statute",
+                score=1.0,
+                source_url="https://www.indiacode.nic.in/handle/123456789/21544",
+            )
+            return ChatResponse(
+                answer=(
+                    "The Bharatiya Nagarik Suraksha Sanhita, 2023 contains 531 sections. "
+                    "This is based on the official India Code text, where the statute runs from section 1 to section 531."
+                ),
+                reasoning=(
+                    "This answer is taken from the statute structure itself rather than semantic retrieval. "
+                    "For structural questions, NyayaSetu should use the official act text directly."
+                ),
+                sources=[source],
+                in_scope=True,
+            )
+
+        if re.search(r"\bbns\b", normalized) or "bharatiya nyaya sanhita" in normalized:
             source = SourceDocument(
                 title="Bharatiya Nyaya Sanhita, 2023",
                 citation="India Code Act No. 45 of 2023",
@@ -370,15 +395,56 @@ class LegalEngine:
                 in_scope=True,
             )
 
+        if re.search(r"\bbsa\b", normalized) or "bharatiya sakshya adhiniyam" in normalized:
+            source = SourceDocument(
+                title="Bharatiya Sakshya Adhiniyam, 2023",
+                citation="India Code Act No. 47 of 2023",
+                excerpt=(
+                    "In the official India Code text of the Bharatiya Sakshya Adhiniyam, 2023, "
+                    "the statute runs from section 1 to section 170."
+                ),
+                source_type="statute",
+                score=1.0,
+                source_url="https://www.indiacode.nic.in/handle/123456789/20063",
+            )
+            return ChatResponse(
+                answer=(
+                    "The Bharatiya Sakshya Adhiniyam, 2023 contains 170 sections. "
+                    "This is based on the official India Code text, where the statute runs from section 1 to section 170."
+                ),
+                reasoning=(
+                    "This answer is taken from the statute structure itself rather than semantic retrieval. "
+                    "For structural questions, NyayaSetu should use the official act text directly."
+                ),
+                sources=[source],
+                in_scope=True,
+            )
+
         return None
 
     def _prioritize_hits_for_question(self, question: str, hits: list[dict]) -> list[dict]:
         normalized = question.lower()
         prioritized = hits
-        if "bns" in normalized or "bharatiya nyaya sanhita" in normalized:
+        if re.search(r"\bbns\b", normalized) or "bharatiya nyaya sanhita" in normalized:
             filtered = [
                 item for item in hits
                 if "bns" in f"{item.get('title', '')} {item.get('citation', '')} {item.get('text', '')}".lower()
+            ]
+            if filtered:
+                prioritized = filtered
+        if re.search(r"\bbnss\b", normalized) or "bharatiya nagarik suraksha sanhita" in normalized:
+            filtered = [
+                item for item in prioritized
+                if "bnss" in f"{item.get('title', '')} {item.get('citation', '')} {item.get('text', '')}".lower()
+                or "bharatiya nagarik suraksha sanhita" in f"{item.get('title', '')} {item.get('citation', '')} {item.get('text', '')}".lower()
+            ]
+            if filtered:
+                prioritized = filtered
+        if re.search(r"\bbsa\b", normalized) or "bharatiya sakshya adhiniyam" in normalized:
+            filtered = [
+                item for item in prioritized
+                if "bsa" in f"{item.get('title', '')} {item.get('citation', '')} {item.get('text', '')}".lower()
+                or "bharatiya sakshya adhiniyam" in f"{item.get('title', '')} {item.get('citation', '')} {item.get('text', '')}".lower()
             ]
             if filtered:
                 prioritized = filtered

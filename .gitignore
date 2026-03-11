@@ -21,10 +21,14 @@ htmlcov/
 /models/
 storage/uploads/*
 !storage/uploads/.gitkeep
-data/index/
+data/index/*
+!data/index/legal.index
+!data/index/legal_metadata.json
 frontend/.vite/
 frontend/dist/
 backend/.coverage
 training/output/
 training/runs/
 minio/
+ingestion/raw/
+storage/tmp/

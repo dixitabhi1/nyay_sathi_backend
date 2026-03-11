@@ -10,6 +10,8 @@ from pypdf import PdfReader
 
 
 SECTION_REGEX = re.compile(r"(?im)^(section\s+\d+[a-zA-Z-]*\.?.*|chapter\s+[ivxlcdm]+.*|\d+\.\s+.+)$")
+SHORT_TITLE_START_REGEX = re.compile(r"(?im)^\s*1\.\s+short title[^\n]*$")
+SECTION_HEADING_REGEX = re.compile(r"(?im)^\s*(?P<number>\d+[A-Za-z-]*)\.\s*[—–-]?\s*(?P<title>[^\n]+?)\s*$")
 SECTION_NUMBER_REGEX = re.compile(r"(?i)(?:section\s+)?(\d+[A-Za-z-]*)")
 SUBSECTION_SPLIT_REGEX = re.compile(r"(?=(?:^|\n)\((\d+[A-Za-z]?)\)\s+)")
 CITATION_PATTERNS = [
@@ -44,6 +46,13 @@ def normalize_text(text: str) -> str:
 
 
 def trim_statute_front_matter(text: str) -> str:
+    if "ARRANGEMENT OF SECTIONS" in text.upper():
+        short_title_matches = list(SHORT_TITLE_START_REGEX.finditer(text))
+        if len(short_title_matches) >= 2:
+            return text[short_title_matches[1].start():]
+        if short_title_matches:
+            return text[short_title_matches[0].start():]
+
     marker_candidates = [
         "BE it enacted by Parliament",
         "BE it enacted",
@@ -104,6 +113,19 @@ def chunk_text(text: str, chunk_chars: int, overlap: int) -> list[str]:
 
 
 def split_statute_sections(text: str) -> list[tuple[str, str]]:
+    heading_matches = list(SECTION_HEADING_REGEX.finditer(text))
+    if heading_matches:
+        sections: list[tuple[str, str]] = []
+        for index, match in enumerate(heading_matches):
+            start = match.start()
+            end = heading_matches[index + 1].start() if index + 1 < len(heading_matches) else len(text)
+            block = text[start:end].strip()
+            if not block:
+                continue
+            sections.append((match.group(0).strip(), block))
+        if sections:
+            return sections
+
     lines = [line.strip() for line in text.splitlines()]
     blocks: list[tuple[str, list[str]]] = []
     current_heading = "Preamble"
@@ -173,10 +195,12 @@ def build_statute_chunks(document: dict) -> list[dict]:
                     {
                         "chunk_id": chunk_id,
                         "document_id": document["document_id"],
+                        "source_id": document["source_id"],
                         "title": document["title"],
                         "citation": f"{document['citation']} | {granular_heading}" if document.get("citation") else granular_heading,
                         "source_type": document["source_type"],
                         "document_type": document["document_type"],
+                        "jurisdiction": document["jurisdiction"],
                         "language": document["language"],
                         "source_url": document["source_url"],
                         "text": chunk,
@@ -199,10 +223,12 @@ def build_judgment_chunks(document: dict) -> list[dict]:
             {
                 "chunk_id": chunk_id,
                 "document_id": document["document_id"],
+                "source_id": document["source_id"],
                 "title": document["title"],
                 "citation": document["citation"] or document["title"],
                 "source_type": document["source_type"],
                 "document_type": document["document_type"],
+                "jurisdiction": document["jurisdiction"],
                 "language": document["language"],
                 "source_url": document["source_url"],
                 "text": chunk,
