@@ -10,6 +10,7 @@ from app.services.evidence_intelligence import EvidenceIntelligenceService
 from app.services.fir_extraction import FIRExtractionService
 from app.services.fir_completeness import FIRCompletenessService
 from app.services.fir_service import FIRService
+from app.services.history import UserHistoryService
 from app.services.corpus_registry import CorpusRegistry
 from app.services.document_ingestion import DocumentIngestionService
 from app.services.embeddings import EmbeddingService
@@ -101,6 +102,12 @@ def get_audit_service() -> AuditService:
 def get_auth_service() -> AuthService:
     init_db()
     return AuthService(get_settings())
+
+
+@lru_cache
+def get_history_service() -> UserHistoryService:
+    init_db()
+    return UserHistoryService()
 
 
 @lru_cache

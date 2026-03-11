@@ -1,6 +1,8 @@
 from fastapi import APIRouter, Depends, File, Form, UploadFile
 
 from app.core.dependencies import get_audit_service, get_legal_engine
+from app.core.security import get_optional_current_user
+from app.models.auth import User
 from app.schemas.documents import ContractAnalysisResponse, EvidenceAnalysisResponse
 from app.services.audit import AuditService
 from app.services.legal_engine import LegalEngine
@@ -16,7 +18,9 @@ async def analyze_contract(
     user_id: str | None = Form(default=None),
     engine: LegalEngine = Depends(get_legal_engine),
     audit_service: AuditService = Depends(get_audit_service),
+    current_user: User | None = Depends(get_optional_current_user),
 ) -> ContractAnalysisResponse:
+    user_id = current_user.id if current_user else user_id
     response = await engine.analyze_contract(contract_file, contract_text, user_id)
     audit_service.log("documents.contract", {"filename": getattr(contract_file, "filename", None)}, response.model_dump(), user_id)
     return response
@@ -29,8 +33,9 @@ async def analyze_evidence(
     user_id: str | None = Form(default=None),
     engine: LegalEngine = Depends(get_legal_engine),
     audit_service: AuditService = Depends(get_audit_service),
+    current_user: User | None = Depends(get_optional_current_user),
 ) -> EvidenceAnalysisResponse:
+    user_id = current_user.id if current_user else user_id
     response = await engine.analyze_evidence(evidence_file, evidence_text, user_id)
     audit_service.log("documents.evidence", {"filename": getattr(evidence_file, "filename", None)}, response.model_dump(), user_id)
     return response
-

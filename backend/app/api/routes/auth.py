@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, Header, Request
-from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from fastapi.security import HTTPAuthorizationCredentials
 
+from app.core.security import get_current_user, security
 from app.core.dependencies import get_auth_service
 from app.models.auth import User
 from app.schemas.auth import (
@@ -14,18 +15,6 @@ from app.services.auth import AuthService
 
 
 router = APIRouter()
-security = HTTPBearer(auto_error=False)
-
-
-def get_current_user(
-    credentials: HTTPAuthorizationCredentials = Depends(security),
-    auth_service: AuthService = Depends(get_auth_service),
-) -> User:
-    if not credentials or credentials.scheme.lower() != "bearer":
-        from fastapi import HTTPException, status
-
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication credentials were not provided.")
-    return auth_service.get_user_from_token(credentials.credentials)
 
 
 @router.post("/register", response_model=AuthTokenResponse)

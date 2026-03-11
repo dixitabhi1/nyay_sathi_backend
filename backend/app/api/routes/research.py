@@ -1,6 +1,8 @@
 from fastapi import APIRouter, Depends
 
 from app.core.dependencies import get_audit_service, get_legal_engine
+from app.core.security import get_optional_current_user
+from app.models.auth import User
 from app.schemas.research import ResearchRequest, ResearchResponse
 from app.services.audit import AuditService
 from app.services.legal_engine import LegalEngine
@@ -14,8 +16,9 @@ def research_search(
     payload: ResearchRequest,
     engine: LegalEngine = Depends(get_legal_engine),
     audit_service: AuditService = Depends(get_audit_service),
+    current_user: User | None = Depends(get_optional_current_user),
 ) -> ResearchResponse:
+    payload.user_id = current_user.id if current_user else payload.user_id
     response = engine.research(payload)
     audit_service.log("research.search", payload.model_dump(), response.model_dump(), payload.user_id)
     return response
-

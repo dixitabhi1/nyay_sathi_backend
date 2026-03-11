@@ -1,6 +1,8 @@
 from fastapi import APIRouter, Depends, File, Form, UploadFile
 
 from app.core.dependencies import get_audit_service, get_fir_service
+from app.core.security import get_optional_current_user
+from app.models.auth import User
 from app.schemas.fir import (
     FIRCompletenessResponse,
     FIRCrimePatternResponse,
@@ -32,7 +34,9 @@ def create_manual_fir(
     payload: FIRManualRequest,
     fir_service: FIRService = Depends(get_fir_service),
     audit_service: AuditService = Depends(get_audit_service),
+    current_user: User | None = Depends(get_optional_current_user),
 ) -> FIRRecordResponse:
+    payload.user_id = current_user.id if current_user else payload.user_id
     response = fir_service.create_manual_fir(payload)
     audit_service.log("fir.manual", payload.model_dump(), response.model_dump(), payload.user_id)
     return response
@@ -42,7 +46,9 @@ def create_manual_fir(
 def preview_manual_fir(
     payload: FIRManualRequest,
     fir_service: FIRService = Depends(get_fir_service),
+    current_user: User | None = Depends(get_optional_current_user),
 ) -> FIRUploadIntakeResponse:
+    payload.user_id = current_user.id if current_user else payload.user_id
     return fir_service.preview_manual_fir(payload)
 
 
@@ -62,7 +68,9 @@ async def create_fir_from_upload(
     user_id: str | None = Form(default=None),
     fir_service: FIRService = Depends(get_fir_service),
     audit_service: AuditService = Depends(get_audit_service),
+    current_user: User | None = Depends(get_optional_current_user),
 ) -> FIRRecordResponse:
+    user_id = current_user.id if current_user else user_id
     response = await fir_service.create_fir_from_upload(complaint_file, police_station, user_id)
     audit_service.log(
         "fir.upload",
@@ -82,7 +90,9 @@ async def create_fir_from_voice(
     user_id: str | None = Form(default=None),
     fir_service: FIRService = Depends(get_fir_service),
     audit_service: AuditService = Depends(get_audit_service),
+    current_user: User | None = Depends(get_optional_current_user),
 ) -> FIRRecordResponse:
+    user_id = current_user.id if current_user else user_id
     payload = None
     if transcript_text:
         payload = FIRVoiceTranscriptRequest(
@@ -108,6 +118,7 @@ async def preview_voice_processing(
     police_station: str | None = Form(default=None),
     complainant_name: str | None = Form(default=None),
     fir_service: FIRService = Depends(get_fir_service),
+    current_user: User | None = Depends(get_optional_current_user),
 ) -> FIRVoiceProcessingResponse:
     payload = None
     if transcript_text:
@@ -115,6 +126,7 @@ async def preview_voice_processing(
             transcript_text=transcript_text,
             police_station=police_station,
             complainant_name=complainant_name,
+            user_id=current_user.id if current_user else None,
         )
     return await fir_service.preview_voice_processing(audio_file=audio_file, payload=payload)
 
@@ -164,16 +176,18 @@ def crime_patterns(
 def list_fir_records(
     limit: int = 25,
     fir_service: FIRService = Depends(get_fir_service),
+    current_user: User | None = Depends(get_optional_current_user),
 ) -> FIRRecordListResponse:
-    return fir_service.list_records(limit=limit)
+    return fir_service.list_records(limit=limit, user_id=current_user.id if current_user else None)
 
 
 @router.get("/{fir_id}", response_model=FIRRecordResponse)
 def get_fir_record(
     fir_id: str,
     fir_service: FIRService = Depends(get_fir_service),
+    current_user: User | None = Depends(get_optional_current_user),
 ) -> FIRRecordResponse:
-    return fir_service.get_fir_record(fir_id)
+    return fir_service.get_fir_record(fir_id, user_id=current_user.id if current_user else None)
 
 
 @router.put("/{fir_id}/draft", response_model=FIRRecordResponse)
@@ -182,8 +196,10 @@ def update_fir_draft(
     payload: FIRDraftUpdateRequest,
     fir_service: FIRService = Depends(get_fir_service),
     audit_service: AuditService = Depends(get_audit_service),
+    current_user: User | None = Depends(get_optional_current_user),
 ) -> FIRRecordResponse:
-    response = fir_service.update_draft(fir_id, payload)
+    payload.edited_by = current_user.id if current_user else payload.edited_by
+    response = fir_service.update_draft(fir_id, payload, user_id=current_user.id if current_user else None)
     audit_service.log("fir.update_draft", payload.model_dump(), response.model_dump(), payload.edited_by)
     return response
 
@@ -192,16 +208,18 @@ def update_fir_draft(
 def list_fir_versions(
     fir_id: str,
     fir_service: FIRService = Depends(get_fir_service),
+    current_user: User | None = Depends(get_optional_current_user),
 ) -> FIRVersionsResponse:
-    return fir_service.list_versions(fir_id)
+    return fir_service.list_versions(fir_id, user_id=current_user.id if current_user else None)
 
 
 @router.get("/{fir_id}/intelligence", response_model=FIRIntelligenceResponse)
 def fir_intelligence(
     fir_id: str,
     fir_service: FIRService = Depends(get_fir_service),
+    current_user: User | None = Depends(get_optional_current_user),
 ) -> FIRIntelligenceResponse:
-    return fir_service.intelligence_summary(fir_id)
+    return fir_service.intelligence_summary(fir_id, user_id=current_user.id if current_user else None)
 
 
 @router.post("/{fir_id}/evidence", response_model=FIRRecordResponse)
@@ -210,8 +228,9 @@ async def upload_fir_evidence(
     evidence_files: list[UploadFile] = File(...),
     fir_service: FIRService = Depends(get_fir_service),
     audit_service: AuditService = Depends(get_audit_service),
+    current_user: User | None = Depends(get_optional_current_user),
 ) -> FIRRecordResponse:
-    response = await fir_service.attach_evidence(fir_id, evidence_files)
+    response = await fir_service.attach_evidence(fir_id, evidence_files, user_id=current_user.id if current_user else None)
     audit_service.log(
         "fir.evidence",
         {"fir_id": fir_id, "files": [upload.filename for upload in evidence_files]},

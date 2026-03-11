@@ -220,11 +220,11 @@ class FIRService:
             completeness=self.completeness_service.evaluate(extracted),
         )
 
-    def get_fir_record(self, fir_id: str) -> FIRRecordResponse:
+    def get_fir_record(self, fir_id: str, user_id: str | None = None) -> FIRRecordResponse:
         session = SessionLocal()
         try:
             record = session.get(FIRRecord, fir_id)
-            if not record:
+            if not record or (user_id and record.user_id and record.user_id != user_id):
                 raise HTTPException(status_code=404, detail="FIR record not found.")
             evidence_rows = session.query(FIREvidence).filter(FIREvidence.fir_id == fir_id).order_by(FIREvidence.id.asc()).all()
             intelligence = session.get(FIRIntelligence, fir_id)
@@ -232,10 +232,13 @@ class FIRService:
         finally:
             session.close()
 
-    def list_records(self, limit: int = 25) -> FIRRecordListResponse:
+    def list_records(self, limit: int = 25, user_id: str | None = None) -> FIRRecordListResponse:
         session = SessionLocal()
         try:
-            rows = session.query(FIRRecord).order_by(FIRRecord.last_edited_at.desc()).limit(limit).all()
+            query = session.query(FIRRecord)
+            if user_id:
+                query = query.filter(FIRRecord.user_id == user_id)
+            rows = query.order_by(FIRRecord.last_edited_at.desc()).limit(limit).all()
             summaries: list[FIRRecordSummary] = []
             for row in rows:
                 extracted = FIRStructuredData.model_validate_json(row.extracted_payload)
@@ -258,11 +261,11 @@ class FIRService:
         finally:
             session.close()
 
-    def update_draft(self, fir_id: str, payload: FIRDraftUpdateRequest) -> FIRRecordResponse:
+    def update_draft(self, fir_id: str, payload: FIRDraftUpdateRequest, user_id: str | None = None) -> FIRRecordResponse:
         session = SessionLocal()
         try:
             record = session.get(FIRRecord, fir_id)
-            if not record:
+            if not record or (user_id and record.user_id and record.user_id != user_id):
                 raise HTTPException(status_code=404, detail="FIR record not found.")
             next_version = record.current_version + 1
             now = datetime.utcnow()
@@ -287,9 +290,12 @@ class FIRService:
         finally:
             session.close()
 
-    def list_versions(self, fir_id: str) -> FIRVersionsResponse:
+    def list_versions(self, fir_id: str, user_id: str | None = None) -> FIRVersionsResponse:
         session = SessionLocal()
         try:
+            record = session.get(FIRRecord, fir_id)
+            if not record or (user_id and record.user_id and record.user_id != user_id):
+                raise HTTPException(status_code=404, detail="FIR record not found.")
             rows = session.query(FIRVersion).filter(FIRVersion.fir_id == fir_id).order_by(FIRVersion.version_number.asc()).all()
             return FIRVersionsResponse(
                 fir_id=fir_id,
@@ -307,7 +313,8 @@ class FIRService:
         finally:
             session.close()
 
-    async def attach_evidence(self, fir_id: str, files: list[UploadFile]) -> FIRRecordResponse:
+    async def attach_evidence(self, fir_id: str, files: list[UploadFile], user_id: str | None = None) -> FIRRecordResponse:
+        self.get_fir_record(fir_id, user_id=user_id)
         for upload in files:
             saved_path = await self.document_ingestion.save_upload(upload)
             self._attach_saved_evidence(
@@ -316,7 +323,7 @@ class FIRService:
                 str(saved_path),
                 upload.content_type or "application/octet-stream",
             )
-        return self.get_fir_record(fir_id)
+        return self.get_fir_record(fir_id, user_id=user_id)
 
     async def analyze_evidence(self, fir_id: str | None, files: list[UploadFile]) -> FIREvidenceAnalysisResponse:
         return await self.evidence_intelligence.analyze_uploads(files, fir_id)
@@ -334,8 +341,8 @@ class FIRService:
     def crime_patterns(self, window_days: int = 7) -> FIRCrimePatternResponse:
         return self.crime_pattern_service.get_patterns(window_days=window_days)
 
-    def intelligence_summary(self, fir_id: str) -> FIRIntelligenceResponse:
-        record = self.get_fir_record(fir_id)
+    def intelligence_summary(self, fir_id: str, user_id: str | None = None) -> FIRIntelligenceResponse:
+        record = self.get_fir_record(fir_id, user_id=user_id)
         pattern = None
         if record.jurisdiction and record.jurisdiction.latitude is not None and record.jurisdiction.longitude is not None:
             nearby_count = self.crime_pattern_service.nearby_records(
