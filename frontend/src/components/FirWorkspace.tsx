@@ -190,6 +190,7 @@ export function FirWorkspace() {
   const [isRecording, setIsRecording] = useState(false);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
+  const resultsRef = useRef<HTMLDivElement | null>(null);
   const deferredDraft = useDeferredValue(draftText);
 
   const [manualForm, setManualForm] = useState({
@@ -277,11 +278,14 @@ export function FirWorkspace() {
         witness_details: splitList(manualForm.witness_details),
         evidence_information: splitList(manualForm.evidence_information),
       })) as FIRRecordResponse;
+      setPreview(null);
+      setVoicePreview(null);
       setRecord(response);
       setDraftText(response.draft_text);
       await loadVersions(response.fir_id);
       await loadIntelligence(response.fir_id);
       await loadCrimePatterns();
+      queueResultsScroll();
     } catch (caughtError) {
       setError(caughtError instanceof Error ? caughtError.message : "Failed to create FIR draft.");
     } finally {
@@ -299,8 +303,13 @@ export function FirWorkspace() {
         witness_details: splitList(manualForm.witness_details),
         evidence_information: splitList(manualForm.evidence_information),
       })) as FIRPreviewResponse;
+      setRecord(null);
+      setVersions([]);
+      setIntelligence(null);
+      setVoicePreview(null);
       setPreview(response);
       setDraftText(response.draft_text);
+      queueResultsScroll();
     } catch (caughtError) {
       setError(caughtError instanceof Error ? caughtError.message : "Failed to load FIR preview.");
     } finally {
@@ -321,8 +330,13 @@ export function FirWorkspace() {
       formData.append("complaint_file", uploadFile);
       formData.append("police_station", uploadPoliceStation);
       const response = (await api.firUploadPreview(formData)) as FIRPreviewResponse;
+      setRecord(null);
+      setVersions([]);
+      setIntelligence(null);
+      setVoicePreview(null);
       setPreview(response);
       setDraftText(response.draft_text);
+      queueResultsScroll();
     } catch (caughtError) {
       setError(caughtError instanceof Error ? caughtError.message : "Failed to preview complaint extraction.");
     } finally {
@@ -342,11 +356,14 @@ export function FirWorkspace() {
       formData.append("complaint_file", uploadFile);
       formData.append("police_station", uploadPoliceStation);
       const response = (await api.firUpload(formData)) as FIRRecordResponse;
+      setPreview(null);
+      setVoicePreview(null);
       setRecord(response);
       setDraftText(response.draft_text);
       await loadVersions(response.fir_id);
       await loadIntelligence(response.fir_id);
       await loadCrimePatterns();
+      queueResultsScroll();
     } catch (caughtError) {
       setError(caughtError instanceof Error ? caughtError.message : "Failed to create FIR from upload.");
     } finally {
@@ -368,11 +385,14 @@ export function FirWorkspace() {
       formData.append("police_station", voiceForm.police_station);
       formData.append("complainant_name", voiceForm.complainant_name);
       const response = (await api.firVoice(formData)) as FIRRecordResponse;
+      setPreview(null);
+      setVoicePreview(null);
       setRecord(response);
       setDraftText(response.draft_text);
       await loadVersions(response.fir_id);
       await loadIntelligence(response.fir_id);
       await loadCrimePatterns();
+      queueResultsScroll();
     } catch (caughtError) {
       setError(caughtError instanceof Error ? caughtError.message : "Failed to process voice FIR.");
     } finally {
@@ -463,6 +483,10 @@ export function FirWorkspace() {
       formData.append("police_station", voiceForm.police_station);
       formData.append("complainant_name", voiceForm.complainant_name);
       const response = (await api.firVoicePreview(formData)) as FIRVoiceProcessingResponse;
+      setRecord(null);
+      setVersions([]);
+      setIntelligence(null);
+      setPreview(null);
       setVoicePreview(response);
       setDraftText(
         [
@@ -473,6 +497,7 @@ export function FirWorkspace() {
           ...response.sections.map((section) => `- ${section.section}: ${section.title}`),
         ].join("\n"),
       );
+      queueResultsScroll();
     } catch (caughtError) {
       setError(caughtError instanceof Error ? caughtError.message : "Failed to preview voice FIR.");
     } finally {
@@ -502,7 +527,26 @@ export function FirWorkspace() {
     }
   }
 
+  function queueResultsScroll() {
+    window.setTimeout(() => {
+      resultsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 50);
+  }
+
   const activePreview = workflow === "voice" ? voicePreview : preview;
+  const extractedData = activePreview?.extracted_data ?? record?.extracted_data ?? null;
+  const sectionSuggestions = activePreview?.sections ?? record?.sections ?? [];
+  const jurisdiction = activePreview?.jurisdiction ?? record?.jurisdiction ?? null;
+  const completeness = activePreview?.completeness ?? record?.completeness ?? null;
+  const caseStrengthScore =
+    workflow === "voice"
+      ? record?.case_strength_score ?? 0
+      : preview?.case_strength_score ?? record?.case_strength_score ?? 0;
+  const caseStrengthReasons =
+    workflow === "voice"
+      ? record?.case_strength_reasoning ?? []
+      : preview?.case_strength_reasoning ?? record?.case_strength_reasoning ?? [];
+  const draftDisclaimer = preview?.disclaimer ?? record?.disclaimer ?? null;
 
   return (
     <div className="fir-workspace">
@@ -695,15 +739,75 @@ export function FirWorkspace() {
         </section>
 
         <section className="fir-results">
-          <div className="fir-summary-card">
-            <h3>Extracted Data</h3>
-            <pre>{JSON.stringify(record?.extracted_data ?? activePreview?.extracted_data ?? null, null, 2)}</pre>
+          <div className="fir-summary-card" ref={resultsRef}>
+            <div className="card-header-inline">
+              <h3>Extracted Data</h3>
+              <span className="status-pill">{activePreview ? "Preview Loaded" : record ? "Saved Draft" : "Waiting"}</span>
+            </div>
+            {extractedData ? (
+              <dl className="fir-data-list">
+                <div>
+                  <dt>Complainant</dt>
+                  <dd>{extractedData.complainant_name ?? "Not provided"}</dd>
+                </div>
+                <div>
+                  <dt>Parent</dt>
+                  <dd>{extractedData.parent_name ?? "Not provided"}</dd>
+                </div>
+                <div>
+                  <dt>Address</dt>
+                  <dd>{extractedData.address ?? "Not provided"}</dd>
+                </div>
+                <div>
+                  <dt>Contact</dt>
+                  <dd>{extractedData.contact_number ?? "Not provided"}</dd>
+                </div>
+                <div>
+                  <dt>Police Station</dt>
+                  <dd>{extractedData.police_station ?? "Not provided"}</dd>
+                </div>
+                <div>
+                  <dt>Incident Date</dt>
+                  <dd>{extractedData.incident_date ?? "Not provided"}</dd>
+                </div>
+                <div>
+                  <dt>Incident Time</dt>
+                  <dd>{extractedData.incident_time ?? "Not provided"}</dd>
+                </div>
+                <div>
+                  <dt>Location</dt>
+                  <dd>{extractedData.incident_location ?? "Not provided"}</dd>
+                </div>
+                <div className="fir-data-wide">
+                  <dt>Description</dt>
+                  <dd>{extractedData.incident_description}</dd>
+                </div>
+                <div>
+                  <dt>Accused</dt>
+                  <dd>{extractedData.accused_details.length > 0 ? extractedData.accused_details.join(", ") : "Not provided"}</dd>
+                </div>
+                <div>
+                  <dt>Witnesses</dt>
+                  <dd>{extractedData.witness_details.length > 0 ? extractedData.witness_details.join(", ") : "Not provided"}</dd>
+                </div>
+                <div>
+                  <dt>Evidence</dt>
+                  <dd>
+                    {extractedData.evidence_information.length > 0
+                      ? extractedData.evidence_information.join(", ")
+                      : "Not provided"}
+                  </dd>
+                </div>
+              </dl>
+            ) : (
+              <p className="helper-text">Load a preview or create an FIR draft to see the extracted complaint details here.</p>
+            )}
           </div>
 
           <div className="fir-summary-card">
             <h3>BNS Suggestions</h3>
             <ul className="section-list">
-              {(record?.sections ?? activePreview?.sections ?? []).map((section) => (
+              {sectionSuggestions.map((section) => (
                 <li key={`${section.section}-${section.title}`}>
                   <strong>{section.section}</strong>
                   <span>{section.title}</span>
@@ -715,9 +819,9 @@ export function FirWorkspace() {
 
           <div className="fir-summary-card">
             <h3>Case Strength</h3>
-            <p className="strength-score">{record?.case_strength_score ?? preview?.case_strength_score ?? 0}%</p>
+            <p className="strength-score">{caseStrengthScore}%</p>
             <ul className="rationale-list">
-              {(record?.case_strength_reasoning ?? preview?.case_strength_reasoning ?? []).map((reason) => (
+              {caseStrengthReasons.map((reason) => (
                 <li key={reason}>{reason}</li>
               ))}
             </ul>
@@ -725,22 +829,20 @@ export function FirWorkspace() {
 
           <div className="fir-summary-card">
             <h3>Jurisdiction Suggestion</h3>
-            <p className="strength-score jurisdiction-name">
-              {record?.jurisdiction?.suggested_police_station ?? activePreview?.jurisdiction?.suggested_police_station ?? "Pending"}
-            </p>
+            <p className="strength-score jurisdiction-name">{jurisdiction?.suggested_police_station ?? "Pending"}</p>
             <ul className="rationale-list">
-              <li>Source: {record?.jurisdiction?.source ?? activePreview?.jurisdiction?.source ?? "n/a"}</li>
+              <li>Source: {jurisdiction?.source ?? "n/a"}</li>
               <li>
-                Confidence: {Math.round(((record?.jurisdiction?.confidence ?? activePreview?.jurisdiction?.confidence ?? 0) * 100))}%
+                Confidence: {Math.round(((jurisdiction?.confidence ?? 0) * 100))}%
               </li>
             </ul>
           </div>
 
           <div className="fir-summary-card">
             <h3>Completeness Check</h3>
-            <p className="strength-score">{record?.completeness?.completeness_score ?? activePreview?.completeness?.completeness_score ?? 0}%</p>
+            <p className="strength-score">{completeness?.completeness_score ?? 0}%</p>
             <ul className="rationale-list">
-              {(record?.completeness?.missing_fields ?? activePreview?.completeness?.missing_fields ?? []).map((field) => (
+              {(completeness?.missing_fields ?? []).map((field) => (
                 <li key={field}>{field}</li>
               ))}
             </ul>
@@ -765,7 +867,7 @@ export function FirWorkspace() {
           onChange={(event) => setDraftText(event.target.value)}
           placeholder="Generated FIR draft will appear here."
         />
-        <p className="helper-text">{record?.disclaimer ?? preview?.disclaimer}</p>
+        <p className="helper-text">{draftDisclaimer}</p>
       </section>
 
       <section className="fir-evidence-grid">
