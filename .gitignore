@@ -18,7 +18,7 @@ Thumbs.db
 *.duckdb
 coverage/
 htmlcov/
-models/
+/models/
 storage/uploads/*
 !storage/uploads/.gitkeep
 data/index/
