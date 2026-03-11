@@ -1,7 +1,7 @@
 from functools import lru_cache
 from pathlib import Path
 import secrets
-from urllib.parse import urlparse
+from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
 
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -27,18 +27,29 @@ def normalize_turso_database_url(raw_url: str) -> str:
     if not candidate:
         return candidate
     if candidate.startswith("sqlite+libsql://"):
-        return candidate
+        return _with_turso_remote_params(candidate)
     if candidate.startswith("libsql://"):
-        return f"sqlite+{candidate}"
+        return _with_turso_remote_params(f"sqlite+{candidate}")
 
     parsed = urlparse(candidate)
     if parsed.scheme in {"https", "http"} and parsed.netloc:
-        return f"sqlite+libsql://{parsed.netloc}"
+        return _with_turso_remote_params(f"sqlite+libsql://{parsed.netloc}")
 
     if "://" not in candidate:
-        return f"sqlite+libsql://{candidate.rstrip('/')}"
+        return _with_turso_remote_params(f"sqlite+libsql://{candidate.rstrip('/')}")
 
     return candidate
+
+
+def _with_turso_remote_params(database_url: str) -> str:
+    parsed = urlparse(database_url)
+    if not parsed.netloc:
+        return database_url
+
+    query_items = dict(parse_qsl(parsed.query, keep_blank_values=True))
+    query_items.setdefault("secure", "true")
+    updated_query = urlencode(query_items)
+    return urlunparse(parsed._replace(query=updated_query))
 
 
 class Settings(BaseSettings):
