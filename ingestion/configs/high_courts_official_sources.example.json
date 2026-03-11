@@ -1,0 +1,18 @@
+[
+  {
+    "source_id": "delhi_high_court_judgments",
+    "title": "Delhi High Court judgments",
+    "source_type": "judgment",
+    "document_type": "judgment",
+    "jurisdiction": "Delhi",
+    "court": "High Court of Delhi",
+    "language": "en",
+    "fetcher": "html_pdf_links",
+    "index_url": "https://delhihighcourt.nic.in/",
+    "allowed_domains": ["delhihighcourt.nic.in"],
+    "link_regex": [".*\\.pdf$"],
+    "keywords": ["judgment", "order"],
+    "limit": 100
+  }
+]
+

@@ -1,0 +1,32 @@
+[
+  {
+    "location": "Hazratganj Market, Lucknow",
+    "aliases": ["Hazratganj", "Hazratganj Market"],
+    "police_station": "Hazratganj Police Station",
+    "district": "Lucknow",
+    "state": "Uttar Pradesh",
+    "latitude": 26.8484,
+    "longitude": 80.9462,
+    "confidence": 0.93
+  },
+  {
+    "location": "Koramangala, Bengaluru",
+    "aliases": ["Koramangala", "Koramangala Market"],
+    "police_station": "Koramangala Police Station",
+    "district": "Bengaluru Urban",
+    "state": "Karnataka",
+    "latitude": 12.9352,
+    "longitude": 77.6245,
+    "confidence": 0.91
+  },
+  {
+    "location": "Connaught Place, New Delhi",
+    "aliases": ["Connaught Place", "CP Delhi"],
+    "police_station": "Connaught Place Police Station",
+    "district": "New Delhi",
+    "state": "Delhi",
+    "latitude": 28.6315,
+    "longitude": 77.2167,
+    "confidence": 0.9
+  }
+]

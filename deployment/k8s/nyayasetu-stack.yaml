@@ -1,0 +1,45 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nyayasetu-backend
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: nyayasetu-backend
+  template:
+    metadata:
+      labels:
+        app: nyayasetu-backend
+    spec:
+      containers:
+        - name: backend
+          image: nyayasetu/backend:latest
+          ports:
+            - containerPort: 8000
+          env:
+            - name: APP_SQLITE_PATH
+              value: /data/nyayasetu.sqlite3
+            - name: ANALYTICS_DB_PATH
+              value: /data/legal_corpus.duckdb
+            - name: INFERENCE_PROVIDER
+              value: vllm
+            - name: INFERENCE_BASE_URL
+              value: http://nyayasetu-inference:8000/v1
+          volumeMounts:
+            - name: nyayasetu-data
+              mountPath: /data
+      volumes:
+        - name: nyayasetu-data
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: nyayasetu-backend
+spec:
+  selector:
+    app: nyayasetu-backend
+  ports:
+    - port: 8000
+      targetPort: 8000

@@ -1,0 +1,93 @@
+from __future__ import annotations
+
+import argparse
+import csv
+import json
+import random
+from pathlib import Path
+
+
+def load_jsonl(path: Path) -> list[dict]:
+    return [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
+
+
+def write_jsonl(path: Path, rows: list[dict]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text("\n".join(json.dumps(row, ensure_ascii=True) for row in rows), encoding="utf-8")
+
+
+def load_mappings(path: Path) -> list[dict]:
+    if not path.exists():
+        return []
+    with path.open("r", encoding="utf-8", newline="") as handle:
+        reader = csv.DictReader(handle)
+        return [row for row in reader if any(row.values())]
+
+
+def build_instruction_examples(qa_rows: list[dict], corpus_rows: list[dict], mapping_rows: list[dict]) -> list[dict]:
+    examples: list[dict] = []
+    for row in qa_rows:
+        examples.append(
+            {
+                "instruction": row["question"],
+                "input": row.get("context", ""),
+                "output": row["answer"],
+                "task": "legal_qa",
+            }
+        )
+    for row in corpus_rows:
+        summary = row.get("summary") or row["text"][:400]
+        examples.append(
+            {
+                "instruction": f"Explain the legal significance of {row['citation']} in plain language.",
+                "input": row["text"][:1800],
+                "output": summary,
+                "task": f"{row.get('source_type', 'legal')}_explanation",
+            }
+        )
+    for row in mapping_rows:
+        examples.append(
+            {
+                "instruction": f"Map {row['source_citation']} to its modern legal equivalent.",
+                "input": row.get("notes", ""),
+                "output": f"{row['source_citation']} corresponds to {row['target_citation']} ({row.get('relationship', 'mapped')}).",
+                "task": "section_mapping",
+            }
+        )
+    return examples
+
+
+def split_rows(rows: list[dict], eval_ratio: float, seed: int) -> tuple[list[dict], list[dict]]:
+    random.Random(seed).shuffle(rows)
+    split_index = max(1, int(len(rows) * (1 - eval_ratio)))
+    return rows[:split_index], rows[split_index:]
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description="Prepare NyayaSetu instruction tuning datasets.")
+    parser.add_argument("--qa-path", default="training/data/raw/legal_qa.jsonl")
+    parser.add_argument("--corpus-path", default="data/corpus/official_legal_corpus.jsonl")
+    parser.add_argument("--fallback-corpus-path", default="data/sample/legal_corpus/legal_corpus.jsonl")
+    parser.add_argument("--mapping-csv", default="ingestion/configs/ipc_bns_mappings.csv")
+    parser.add_argument("--output-dir", default="training/data/processed")
+    parser.add_argument("--eval-ratio", type=float, default=0.2)
+    parser.add_argument("--seed", type=int, default=42)
+    args = parser.parse_args()
+
+    qa_rows = load_jsonl(Path(args.qa_path))
+    corpus_path = Path(args.corpus_path)
+    if not corpus_path.exists():
+        corpus_path = Path(args.fallback_corpus_path)
+    corpus_rows = load_jsonl(corpus_path)
+    mapping_rows = load_mappings(Path(args.mapping_csv))
+    examples = build_instruction_examples(qa_rows, corpus_rows, mapping_rows)
+    train_rows, eval_rows = split_rows(examples, args.eval_ratio, args.seed)
+
+    output_dir = Path(args.output_dir)
+    write_jsonl(output_dir / "train.jsonl", train_rows)
+    write_jsonl(output_dir / "eval.jsonl", eval_rows)
+    print(f"Prepared {len(train_rows)} train and {len(eval_rows)} eval examples in {output_dir}.")
+
+
+if __name__ == "__main__":
+    main()

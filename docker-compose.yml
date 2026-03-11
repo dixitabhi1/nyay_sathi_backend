@@ -1,0 +1,60 @@
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: docker/backend.Dockerfile
+    env_file:
+      - .env.example
+    environment:
+      APP_ENV: development
+      APP_SQLITE_PATH: /app/storage/db/nyayasetu.sqlite3
+      ANALYTICS_DB_PATH: /app/data/analytics/legal_corpus.duckdb
+      LEGAL_CORPUS_PATH: /app/data/corpus/official_legal_corpus.jsonl
+      INFERENCE_BASE_URL: http://inference:8000/v1
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./data:/app/data
+      - ./storage:/app/storage
+
+  frontend:
+    build:
+      context: .
+      dockerfile: docker/frontend.Dockerfile
+      args:
+        VITE_API_URL: http://localhost:8000/api/v1
+    depends_on:
+      - backend
+    ports:
+      - "5173:80"
+
+  inference:
+    image: vllm/vllm-openai:latest
+    profiles:
+      - gpu
+    command:
+      - --model
+      - /models/mistral-7b-instruct
+      - --served-model-name
+      - nyayasetu-legal-llm
+      - --host
+      - 0.0.0.0
+      - --port
+      - "8000"
+      - --max-model-len
+      - "8192"
+    environment:
+      HUGGING_FACE_HUB_TOKEN: ${HUGGING_FACE_HUB_TOKEN:-}
+    volumes:
+      - ./models:/models
+    ports:
+      - "8010:8000"
+
+  ollama:
+    image: ollama/ollama:latest
+    profiles:
+      - ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ./models/ollama:/root/.ollama

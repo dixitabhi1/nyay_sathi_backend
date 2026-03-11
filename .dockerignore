@@ -1,0 +1,15 @@
+.git
+.gitignore
+.venv
+node_modules
+frontend/node_modules
+frontend/dist
+backend/__pycache__
+backend/.coverage
+**/__pycache__
+**/*.pyc
+storage/uploads
+storage/logs
+training/output
+training/runs
+docker-compose.yml

@@ -1,0 +1,16 @@
+transformers==4.51.0
+datasets==3.5.0
+peft==0.15.1
+accelerate==1.6.0
+bitsandbytes==0.45.5
+trl==0.17.0
+evaluate==0.4.3
+rouge-score==0.1.2
+PyYAML==6.0.2
+sentence-transformers==4.0.2
+faiss-cpu==1.10.0
+duckdb==1.2.2
+httpx==0.28.1
+beautifulsoup4==4.13.4
+lxml==5.4.0
+pypdf==5.4.0

@@ -1,0 +1,15 @@
+compute_environment: LOCAL_MACHINE
+distributed_type: DEEPSPEED
+downcast_bf16: "no"
+mixed_precision: bf16
+num_machines: 1
+num_processes: 1
+deepspeed_config:
+  zero_stage: 3
+  gradient_accumulation_steps: 8
+  gradient_clipping: 1.0
+  offload_optimizer_device: none
+  offload_param_device: none
+  overlap_comm: true
+  contiguous_gradients: true
+

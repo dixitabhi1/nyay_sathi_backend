@@ -1,0 +1,111 @@
+[
+  {
+    "source_id": "bns_bnss_bsa_acts_2023",
+    "title": "BNS, BNSS, and BSA official act downloads",
+    "source_type": "statute",
+    "document_type": "act",
+    "jurisdiction": "India",
+    "language": "en",
+    "fetcher": "html_pdf_links",
+    "index_url": "https://www.legislative.gov.in/kannada/",
+    "allowed_domains": ["legislative.gov.in"],
+    "link_regex": [".*\\.pdf$"],
+    "keywords": [
+      "Bharatiya Nyaya Sanhita",
+      "Bharatiya Nagarik Suraksha Sanhita",
+      "Bharatiya Sakshya"
+    ],
+    "limit": 10
+  },
+  {
+    "source_id": "ipc_1860",
+    "title": "Indian Penal Code, 1860",
+    "source_type": "statute",
+    "document_type": "act",
+    "jurisdiction": "India",
+    "language": "en",
+    "fetcher": "direct_url",
+    "url": "https://www.indiacode.nic.in/bitstream/123456789/2263/1/A1860-45.pdf",
+    "citation": "Act No. 45 of 1860"
+  },
+  {
+    "source_id": "crpc_1973",
+    "title": "Code of Criminal Procedure, 1973",
+    "source_type": "statute",
+    "document_type": "act",
+    "jurisdiction": "India",
+    "language": "en",
+    "fetcher": "direct_url",
+    "url": "https://www.indiacode.nic.in/bitstream/123456789/16146/1/A1974-2.pdf",
+    "citation": "Act No. 2 of 1974"
+  },
+  {
+    "source_id": "contract_act_1872",
+    "title": "Indian Contract Act, 1872",
+    "source_type": "statute",
+    "document_type": "act",
+    "jurisdiction": "India",
+    "language": "en",
+    "fetcher": "direct_url",
+    "url": "https://www.indiacode.nic.in/bitstream/123456789/2187/1/A1872-9.pdf",
+    "citation": "Act No. 9 of 1872"
+  },
+  {
+    "source_id": "consumer_protection_2019",
+    "title": "Consumer Protection Act, 2019",
+    "source_type": "statute",
+    "document_type": "act",
+    "jurisdiction": "India",
+    "language": "en",
+    "fetcher": "direct_url",
+    "url": "https://www.indiacode.nic.in/bitstream/123456789/1565/1/A1986-68.pdf",
+    "citation": "Act No. 35 of 2019"
+  },
+  {
+    "source_id": "it_act_2000",
+    "title": "Information Technology Act, 2000",
+    "source_type": "statute",
+    "document_type": "act",
+    "jurisdiction": "India",
+    "language": "en",
+    "fetcher": "direct_url",
+    "url": "https://www.indiacode.nic.in/bitstream/123456789/13116/1/it_act_2000_updated.pdf",
+    "citation": "Act No. 21 of 2000"
+  },
+  {
+    "source_id": "supreme_court_latest_judgments",
+    "title": "Supreme Court of India latest judgments",
+    "source_type": "judgment",
+    "document_type": "judgment",
+    "jurisdiction": "India",
+    "court": "Supreme Court of India",
+    "language": "en",
+    "fetcher": "html_pdf_links",
+    "index_url": "https://www.sci.gov.in/",
+    "allowed_domains": ["sci.gov.in", "api.sci.gov.in"],
+    "link_regex": [
+      "api\\.sci\\.gov\\.in/.+\\.pdf",
+      "sci-get-pdf\\?.*type=o"
+    ],
+    "keywords": ["judgment", "order", "latest"],
+    "limit": 50
+  },
+  {
+    "source_id": "egazette_law_and_justice_recent",
+    "title": "eGazette law and justice notifications",
+    "source_type": "gazette",
+    "document_type": "notification",
+    "jurisdiction": "India",
+    "language": "en",
+    "fetcher": "html_pdf_links",
+    "index_url": "https://egazette.gov.in/",
+    "allowed_domains": ["egazette.gov.in"],
+    "link_regex": [
+      "WriteReadData/.+\\.pdf",
+      "SearchGazette\\.aspx"
+    ],
+    "keywords": ["law", "justice", "act", "notification", "ordinance"],
+    "limit": 30
+  }
+]
+
