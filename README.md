@@ -1,6 +1,6 @@
 ---
 title: NyayaSetu
-emoji: scales
+emoji: ⚖️
 colorFrom: blue
 colorTo: green
 sdk: docker
