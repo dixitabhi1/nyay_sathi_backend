@@ -118,6 +118,24 @@ class FIRRecordResponse(BaseModel):
     last_edited_at: str
 
 
+class FIRRecordSummary(BaseModel):
+    fir_id: str
+    workflow: str
+    status: str
+    complainant_name: str | None = None
+    police_station: str | None = None
+    incident_date: str | None = None
+    incident_location: str | None = None
+    case_strength_score: int
+    current_version: int
+    last_edited_at: str
+    draft_excerpt: str
+
+
+class FIRRecordListResponse(BaseModel):
+    records: list[FIRRecordSummary]
+
+
 class FIRManualRequest(BaseModel):
     complainant_name: str
     parent_name: str | None = None

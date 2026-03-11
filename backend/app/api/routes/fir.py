@@ -10,6 +10,7 @@ from app.schemas.fir import (
     FIRJurisdictionRequest,
     FIRJurisdictionSuggestion,
     FIRManualRequest,
+    FIRRecordListResponse,
     FIRRecordResponse,
     FIRSectionPredictionRequest,
     FIRSectionSuggestion,
@@ -157,6 +158,14 @@ def crime_patterns(
     fir_service: FIRService = Depends(get_fir_service),
 ) -> FIRCrimePatternResponse:
     return fir_service.crime_patterns(window_days=window_days)
+
+
+@router.get("", response_model=FIRRecordListResponse)
+def list_fir_records(
+    limit: int = 25,
+    fir_service: FIRService = Depends(get_fir_service),
+) -> FIRRecordListResponse:
+    return fir_service.list_records(limit=limit)
 
 
 @router.get("/{fir_id}", response_model=FIRRecordResponse)

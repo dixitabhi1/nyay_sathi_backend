@@ -20,7 +20,9 @@ from app.schemas.fir import (
     FIRJurisdictionSuggestion,
     FIRJurisdictionRequest,
     FIRManualRequest,
+    FIRRecordListResponse,
     FIRRecordResponse,
+    FIRRecordSummary,
     FIRSectionPredictionRequest,
     FIRSectionSuggestion,
     FIRStructuredData,
@@ -227,6 +229,32 @@ class FIRService:
             evidence_rows = session.query(FIREvidence).filter(FIREvidence.fir_id == fir_id).order_by(FIREvidence.id.asc()).all()
             intelligence = session.get(FIRIntelligence, fir_id)
             return self._serialize_record(record, evidence_rows, intelligence)
+        finally:
+            session.close()
+
+    def list_records(self, limit: int = 25) -> FIRRecordListResponse:
+        session = SessionLocal()
+        try:
+            rows = session.query(FIRRecord).order_by(FIRRecord.last_edited_at.desc()).limit(limit).all()
+            summaries: list[FIRRecordSummary] = []
+            for row in rows:
+                extracted = FIRStructuredData.model_validate_json(row.extracted_payload)
+                summaries.append(
+                    FIRRecordSummary(
+                        fir_id=row.id,
+                        workflow=row.workflow,
+                        status=row.status,
+                        complainant_name=extracted.complainant_name,
+                        police_station=extracted.police_station,
+                        incident_date=extracted.incident_date,
+                        incident_location=extracted.incident_location,
+                        case_strength_score=row.case_strength_score,
+                        current_version=row.current_version,
+                        last_edited_at=row.last_edited_at.isoformat(),
+                        draft_excerpt=row.current_draft[:220],
+                    )
+                )
+            return FIRRecordListResponse(records=summaries)
         finally:
             session.close()
 
