@@ -28,6 +28,7 @@ def get_db() -> Generator:
 
 def init_db() -> None:
     from app.models.audit import AuditLog
+    from app.models.auth import AuthSession, User
     from app.models.fir import FIREvidence, FIRRecord, FIRVersion
 
     Base.metadata.create_all(bind=engine)
