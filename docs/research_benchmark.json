@@ -1,0 +1,413 @@
+{
+  "scope_benchmark": [
+    {
+      "id": "scope_001",
+      "question": "What does Section 87 of BNS cover?",
+      "expected_in_scope": true
+    },
+    {
+      "id": "scope_002",
+      "question": "How many sections are there in BNSS?",
+      "expected_in_scope": true
+    },
+    {
+      "id": "scope_003",
+      "question": "Explain theft under BNS.",
+      "expected_in_scope": true
+    },
+    {
+      "id": "scope_004",
+      "question": "What is BSA section 36 about?",
+      "expected_in_scope": true
+    },
+    {
+      "id": "scope_005",
+      "question": "Can police execute a warrant anywhere in India under BNSS?",
+      "expected_in_scope": true
+    },
+    {
+      "id": "scope_006",
+      "question": "What law applies if someone threatens me online?",
+      "expected_in_scope": true
+    },
+    {
+      "id": "scope_007",
+      "question": "How do I draft an FIR for phone theft?",
+      "expected_in_scope": true
+    },
+    {
+      "id": "scope_008",
+      "question": "What are my rights if police call me for questioning?",
+      "expected_in_scope": true
+    },
+    {
+      "id": "scope_009",
+      "question": "What is the punishment for theft under BNS?",
+      "expected_in_scope": true
+    },
+    {
+      "id": "scope_010",
+      "question": "What does BSA section 145 say?",
+      "expected_in_scope": true
+    },
+    {
+      "id": "scope_011",
+      "question": "what is my name?",
+      "expected_in_scope": false
+    },
+    {
+      "id": "scope_012",
+      "question": "tell me a joke",
+      "expected_in_scope": false
+    },
+    {
+      "id": "scope_013",
+      "question": "what is the weather in Lucknow?",
+      "expected_in_scope": false
+    },
+    {
+      "id": "scope_014",
+      "question": "who won yesterday's cricket match?",
+      "expected_in_scope": false
+    },
+    {
+      "id": "scope_015",
+      "question": "help me with React hooks",
+      "expected_in_scope": false
+    },
+    {
+      "id": "scope_016",
+      "question": "suggest a dinner recipe",
+      "expected_in_scope": false
+    },
+    {
+      "id": "scope_017",
+      "question": "translate hello into French",
+      "expected_in_scope": false
+    },
+    {
+      "id": "scope_018",
+      "question": "plan a trip to Goa",
+      "expected_in_scope": false
+    },
+    {
+      "id": "scope_019",
+      "question": "write a short romantic poem",
+      "expected_in_scope": false
+    },
+    {
+      "id": "scope_020",
+      "question": "Write a legal-style poem about justice.",
+      "expected_in_scope": false
+    }
+  ],
+  "qa_benchmark": [
+    {
+      "id": "qa_001",
+      "question": "How many sections are there in BNS?",
+      "type": "structural",
+      "expected_count": 358,
+      "expected_source_citation": "India Code Act No. 45 of 2023",
+      "expected_keywords": [
+        "358",
+        "bharatiya nyaya sanhita"
+      ]
+    },
+    {
+      "id": "qa_002",
+      "question": "How many sections are there in BNSS?",
+      "type": "structural",
+      "expected_count": 531,
+      "expected_source_citation": "India Code Act No. 46 of 2023",
+      "expected_keywords": [
+        "531",
+        "bharatiya nagarik suraksha sanhita"
+      ]
+    },
+    {
+      "id": "qa_003",
+      "question": "How many sections are there in BSA?",
+      "type": "structural",
+      "expected_count": 170,
+      "expected_source_citation": "India Code Act No. 47 of 2023",
+      "expected_keywords": [
+        "170",
+        "bharatiya sakshya adhiniyam"
+      ]
+    },
+    {
+      "id": "qa_004",
+      "question": "Explain theft under BNS.",
+      "type": "semantic_grounding",
+      "expected_source_citation": "Act No. 45 of 2023 | Section 303",
+      "expected_keywords": [
+        "theft",
+        "movable property"
+      ]
+    },
+    {
+      "id": "qa_exact_001",
+      "question": "What does Section 5 of BNS say?",
+      "type": "exact_section",
+      "expected_source_citation": "Act No. 45 of 2023 | Section 5"
+    },
+    {
+      "id": "qa_exact_002",
+      "question": "What does Section 6 of BNS say?",
+      "type": "exact_section",
+      "expected_source_citation": "Act No. 45 of 2023 | Section 6"
+    },
+    {
+      "id": "qa_exact_003",
+      "question": "What does Section 7 of BNS say?",
+      "type": "exact_section",
+      "expected_source_citation": "Act No. 45 of 2023 | Section 7"
+    },
+    {
+      "id": "qa_exact_004",
+      "question": "What does Section 9 of BNS say?",
+      "type": "exact_section",
+      "expected_source_citation": "Act No. 45 of 2023 | Section 9"
+    },
+    {
+      "id": "qa_exact_005",
+      "question": "What does Section 10 of BNS say?",
+      "type": "exact_section",
+      "expected_source_citation": "Act No. 45 of 2023 | Section 10"
+    },
+    {
+      "id": "qa_exact_006",
+      "question": "What does Section 11 of BNS say?",
+      "type": "exact_section",
+      "expected_source_citation": "Act No. 45 of 2023 | Section 11"
+    },
+    {
+      "id": "qa_exact_007",
+      "question": "What does Section 12 of BNS say?",
+      "type": "exact_section",
+      "expected_source_citation": "Act No. 45 of 2023 | Section 12"
+    },
+    {
+      "id": "qa_exact_008",
+      "question": "What does Section 13 of BNS say?",
+      "type": "exact_section",
+      "expected_source_citation": "Act No. 45 of 2023 | Section 13"
+    },
+    {
+      "id": "qa_exact_009",
+      "question": "What does Section 14 of BNS say?",
+      "type": "exact_section",
+      "expected_source_citation": "Act No. 45 of 2023 | Section 14"
+    },
+    {
+      "id": "qa_exact_010",
+      "question": "What does Section 2 of BNSS say?",
+      "type": "exact_section",
+      "expected_source_citation": "Act No. 46 of 2023 | Section 2"
+    },
+    {
+      "id": "qa_exact_011",
+      "question": "What does Section 1 of BNSS say?",
+      "type": "exact_section",
+      "expected_source_citation": "Act No. 46 of 2023 | Section 1"
+    },
+    {
+      "id": "qa_exact_012",
+      "question": "What does Section 3 of BNSS say?",
+      "type": "exact_section",
+      "expected_source_citation": "Act No. 46 of 2023 | Section 3"
+    },
+    {
+      "id": "qa_exact_013",
+      "question": "What does Section 4 of BNSS say?",
+      "type": "exact_section",
+      "expected_source_citation": "Act No. 46 of 2023 | Section 4"
+    },
+    {
+      "id": "qa_exact_014",
+      "question": "What does Section 5 of BNSS say?",
+      "type": "exact_section",
+      "expected_source_citation": "Act No. 46 of 2023 | Section 5"
+    },
+    {
+      "id": "qa_exact_015",
+      "question": "What does Section 6 of BNSS say?",
+      "type": "exact_section",
+      "expected_source_citation": "Act No. 46 of 2023 | Section 6"
+    },
+    {
+      "id": "qa_exact_016",
+      "question": "What does Section 11 of BNSS say?",
+      "type": "exact_section",
+      "expected_source_citation": "Act No. 46 of 2023 | Section 11"
+    },
+    {
+      "id": "qa_exact_017",
+      "question": "What does Section 13 of BNSS say?",
+      "type": "exact_section",
+      "expected_source_citation": "Act No. 46 of 2023 | Section 13"
+    },
+    {
+      "id": "qa_exact_018",
+      "question": "What does Section 15 of BNSS say?",
+      "type": "exact_section",
+      "expected_source_citation": "Act No. 46 of 2023 | Section 15"
+    },
+    {
+      "id": "qa_exact_019",
+      "question": "What does Section 2 of BSA say?",
+      "type": "exact_section",
+      "expected_source_citation": "Act No. 47 of 2023 | Section 2"
+    },
+    {
+      "id": "qa_exact_020",
+      "question": "What does Section 1 of BSA say?",
+      "type": "exact_section",
+      "expected_source_citation": "Act No. 47 of 2023 | Section 1"
+    },
+    {
+      "id": "qa_exact_021",
+      "question": "What does Section 3 of BSA say?",
+      "type": "exact_section",
+      "expected_source_citation": "Act No. 47 of 2023 | Section 3"
+    },
+    {
+      "id": "qa_exact_022",
+      "question": "What does Section 4 of BSA say?",
+      "type": "exact_section",
+      "expected_source_citation": "Act No. 47 of 2023 | Section 4"
+    },
+    {
+      "id": "qa_exact_023",
+      "question": "What does Section 5 of BSA say?",
+      "type": "exact_section",
+      "expected_source_citation": "Act No. 47 of 2023 | Section 5"
+    },
+    {
+      "id": "qa_exact_024",
+      "question": "What does Section 6 of BSA say?",
+      "type": "exact_section",
+      "expected_source_citation": "Act No. 47 of 2023 | Section 6"
+    },
+    {
+      "id": "qa_exact_025",
+      "question": "What does Section 7 of BSA say?",
+      "type": "exact_section",
+      "expected_source_citation": "Act No. 47 of 2023 | Section 7"
+    },
+    {
+      "id": "qa_exact_026",
+      "question": "What does Section 8 of BSA say?",
+      "type": "exact_section",
+      "expected_source_citation": "Act No. 47 of 2023 | Section 8"
+    },
+    {
+      "id": "qa_exact_027",
+      "question": "What does Section 10 of BSA say?",
+      "type": "exact_section",
+      "expected_source_citation": "Act No. 47 of 2023 | Section 10"
+    }
+  ],
+  "classifier_benchmark": [
+    {
+      "id": "clf_001",
+      "incident_description": "Someone stole my phone from the market while I was shopping.",
+      "expected_title": "Theft"
+    },
+    {
+      "id": "clf_002",
+      "incident_description": "My wallet was stolen on the bus by an unknown person.",
+      "expected_title": "Theft"
+    },
+    {
+      "id": "clf_003",
+      "incident_description": "A man threatened to kill me if I filed a complaint.",
+      "expected_title": "Criminal Intimidation"
+    },
+    {
+      "id": "clf_004",
+      "incident_description": "I was cheated in an online investment scam and lost my money.",
+      "expected_title": "Cheating"
+    },
+    {
+      "id": "clf_005",
+      "incident_description": "My neighbor hit me with a stick and caused injury.",
+      "expected_title": "Voluntarily Causing Hurt / Assault"
+    },
+    {
+      "id": "clf_006",
+      "incident_description": "A man kept stalking and sexually harassing me near my office.",
+      "expected_title": "Sexual Harassment / Stalking"
+    },
+    {
+      "id": "clf_007",
+      "incident_description": "Someone entered my house without permission and refused to leave.",
+      "expected_title": "Criminal Trespass"
+    },
+    {
+      "id": "clf_008",
+      "incident_description": "Unknown persons vandalized my car and broke the windshield.",
+      "expected_title": "Mischief / Property Damage"
+    },
+    {
+      "id": "clf_009",
+      "incident_description": "My bike was stolen from outside the metro station.",
+      "expected_title": "Theft"
+    },
+    {
+      "id": "clf_010",
+      "incident_description": "The caller threatened to leak my data unless I paid him.",
+      "expected_title": "Criminal Intimidation"
+    },
+    {
+      "id": "clf_011",
+      "incident_description": "A fake seller cheated me after taking payment for goods he never delivered.",
+      "expected_title": "Cheating"
+    },
+    {
+      "id": "clf_012",
+      "incident_description": "Two men assaulted me outside my office and caused injuries.",
+      "expected_title": "Voluntarily Causing Hurt / Assault"
+    },
+    {
+      "id": "clf_013",
+      "incident_description": "A stranger kept following me and sending obscene messages.",
+      "expected_title": "Sexual Harassment / Stalking"
+    },
+    {
+      "id": "clf_014",
+      "incident_description": "My former tenant unlawfully entered the premises and damaged the lock.",
+      "expected_title": "Criminal Trespass"
+    },
+    {
+      "id": "clf_015",
+      "incident_description": "Someone broke the windows of my shop and damaged the counter.",
+      "expected_title": "Mischief / Property Damage"
+    },
+    {
+      "id": "clf_016",
+      "incident_description": "My purse was snatched at the bus stop.",
+      "expected_title": "Theft"
+    },
+    {
+      "id": "clf_017",
+      "incident_description": "He threatened to burn my house if I went to the police.",
+      "expected_title": "Criminal Intimidation"
+    },
+    {
+      "id": "clf_018",
+      "incident_description": "The website tricked me into sharing OTP and took my money.",
+      "expected_title": "Cheating"
+    },
+    {
+      "id": "clf_019",
+      "incident_description": "Three persons attacked me with fists and caused bleeding.",
+      "expected_title": "Voluntarily Causing Hurt / Assault"
+    },
+    {
+      "id": "clf_020",
+      "incident_description": "My ex-boyfriend kept threatening me and stalking me near my office.",
+      "expected_title": "Sexual Harassment / Stalking"
+    }
+  ]
+}

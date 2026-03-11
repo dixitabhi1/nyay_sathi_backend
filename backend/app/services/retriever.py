@@ -8,6 +8,22 @@ from app.core.config import Settings
 from app.services.embeddings import EmbeddingService, build_embedding_text
 from app.services.vector_store import FaissVectorStore
 
+EXPLICIT_NON_LEGAL_PATTERNS = [
+    re.compile(r"\bweather\b", re.IGNORECASE),
+    re.compile(r"\bjoke\b", re.IGNORECASE),
+    re.compile(r"\bpoem\b", re.IGNORECASE),
+    re.compile(r"\brecipe\b", re.IGNORECASE),
+    re.compile(r"\bcricket\b", re.IGNORECASE),
+    re.compile(r"\breact hooks?\b", re.IGNORECASE),
+    re.compile(r"\bmy name\b", re.IGNORECASE),
+]
+
+LEGAL_INTENT_PATTERNS = [
+    re.compile(r"\b(section|sections|act|law|legal|fir|complaint|bns|bnss|bsa|ipc)\b", re.IGNORECASE),
+    re.compile(r"\b(arrest|bail|evidence|contract|notice|rights|judgment|court|police)\b", re.IGNORECASE),
+    re.compile(r"\b(theft|cheating|fraud|threat|intimidation|assault|harassment|trespass)\b", re.IGNORECASE),
+]
+
 
 class Retriever:
     def __init__(self, settings: Settings, embeddings: EmbeddingService, vector_store: FaissVectorStore) -> None:
@@ -47,6 +63,10 @@ class Retriever:
         return self.vector_store.search(query_vector, top_k)
 
     def assess_scope(self, query: str) -> dict:
+        explicit_override = self._explicit_scope_override(query)
+        if explicit_override is not None:
+            return explicit_override
+
         exact_hits = self.lookup_exact_reference(query, self.settings.top_k_retrieval)
         if exact_hits:
             top_corpus_score = exact_hits[0]["score"] if exact_hits else 0.0
@@ -81,6 +101,24 @@ class Retriever:
 
     def _warmup_embeddings(self) -> None:
         _ = self.embeddings.legal_scope_anchor_embeddings
+
+    def _explicit_scope_override(self, query: str) -> dict | None:
+        normalized = query.strip().lower()
+        has_legal_intent = any(pattern.search(normalized) for pattern in LEGAL_INTENT_PATTERNS)
+        matched_non_legal = [pattern.pattern for pattern in EXPLICIT_NON_LEGAL_PATTERNS if pattern.search(normalized)]
+
+        if matched_non_legal and not has_legal_intent:
+            return {
+                "in_scope": False,
+                "hits": [],
+                "legal_anchor_score": 0.0,
+                "non_legal_anchor_score": 1.0,
+                "anchor_margin": -1.0,
+                "top_corpus_score": 0.0,
+                "explicit_out_of_scope": True,
+                "matched_non_legal_patterns": matched_non_legal,
+            }
+        return None
 
     def lookup_exact_reference(self, query: str, top_k: int) -> list[dict]:
         normalized = query.lower()
@@ -135,13 +173,33 @@ class Retriever:
         source_id = str(item.get("source_id", "")).lower()
         haystack = f"{source_id} {item.get('title', '')} {item.get('citation', '')}".lower()
         if statute == "bnss":
-            return source_id.startswith("bnss") or bool(re.search(r"\bbnss\b", haystack)) or "bharatiya nagarik suraksha sanhita" in haystack
+            return (
+                source_id == "bnss"
+                or source_id.startswith("bnss_")
+                or bool(re.search(r"\bbnss\b", haystack))
+                or "bharatiya nagarik suraksha sanhita" in haystack
+            )
         if statute == "bns":
-            return source_id.startswith("bns") or bool(re.search(r"\bbns\b", haystack)) or "bharatiya nyaya sanhita" in haystack
+            return (
+                source_id == "bns"
+                or source_id.startswith("bns_")
+                or bool(re.search(r"\bbns\b", haystack))
+                or "bharatiya nyaya sanhita" in haystack
+            )
         if statute == "bsa":
-            return source_id.startswith("bsa") or bool(re.search(r"\bbsa\b", haystack)) or "bharatiya sakshya adhiniyam" in haystack
+            return (
+                source_id == "bsa"
+                or source_id.startswith("bsa_")
+                or bool(re.search(r"\bbsa\b", haystack))
+                or "bharatiya sakshya adhiniyam" in haystack
+            )
         if statute == "ipc":
-            return source_id.startswith("ipc") or bool(re.search(r"\bipc\b", haystack)) or "indian penal code" in haystack
+            return (
+                source_id == "ipc"
+                or source_id.startswith("ipc_")
+                or bool(re.search(r"\bipc\b", haystack))
+                or "indian penal code" in haystack
+            )
         return False
 
     def _rerank_hits(self, query: str, hits: list[dict], top_k: int) -> list[dict]:

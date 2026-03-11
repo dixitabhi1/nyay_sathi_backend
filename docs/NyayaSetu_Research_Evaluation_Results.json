@@ -1,0 +1,1089 @@
+{
+  "metadata": {
+    "generated_at": "2026-03-11T23:17:08",
+    "embedding_model_name": "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2",
+    "inference_provider": "mock",
+    "vector_index_path": "C:\\Users\\ACER\\OneDrive\\Desktop\\Desktop 1\\Nyayasetu\\data\\index\\legal.index",
+    "vector_metadata_path": "C:\\Users\\ACER\\OneDrive\\Desktop\\Desktop 1\\Nyayasetu\\data\\index\\legal_metadata.json",
+    "legal_corpus_path": "C:\\Users\\ACER\\OneDrive\\Desktop\\Desktop 1\\Nyayasetu\\data\\corpus\\official_legal_corpus.jsonl"
+  },
+  "scope_metrics": {
+    "accuracy": 0.95,
+    "precision": 0.9091,
+    "recall": 1.0,
+    "f1": 0.9524,
+    "confusion_matrix": {
+      "tp": 10,
+      "fp": 1,
+      "tn": 9,
+      "fn": 0
+    },
+    "avg_latency_ms": 11.59
+  },
+  "qa_metrics": {
+    "top1_citation_accuracy": 0.9677,
+    "top3_citation_recall": 0.9677,
+    "mrr": 0.9677,
+    "official_source_rate": 1.0,
+    "structural_accuracy": 1.0,
+    "hallucination_rate_proxy": 0.0323,
+    "unsupported_claim_rate_proxy": 0.0323,
+    "avg_latency_ms": 9.61,
+    "error_breakdown": {
+      "wrong_top_citation": 1,
+      "missing_expected_keywords": 1,
+      "unsupported_answer": 1
+    }
+  },
+  "classifier_metrics": {
+    "accuracy": 0.95,
+    "macro_precision": 0.9643,
+    "macro_recall": 0.9524,
+    "macro_f1": 0.951,
+    "avg_latency_ms": 27.74
+  },
+  "overall": {
+    "benchmark_size": {
+      "scope": 20,
+      "qa": 31,
+      "classifier": 20
+    },
+    "research_summary": {
+      "hallucination_rate_proxy": 0.0323,
+      "unsupported_claim_rate_proxy": 0.0323,
+      "scope_f1": 0.9524,
+      "retrieval_top3_recall": 0.9677,
+      "classifier_macro_f1": 0.951
+    }
+  },
+  "scope_rows": [
+    {
+      "id": "scope_001",
+      "question": "What does Section 87 of BNS cover?",
+      "expected_in_scope": true,
+      "predicted_in_scope": true,
+      "latency_ms": 10.98,
+      "scope_warning": null
+    },
+    {
+      "id": "scope_002",
+      "question": "How many sections are there in BNSS?",
+      "expected_in_scope": true,
+      "predicted_in_scope": true,
+      "latency_ms": 0.03,
+      "scope_warning": null
+    },
+    {
+      "id": "scope_003",
+      "question": "Explain theft under BNS.",
+      "expected_in_scope": true,
+      "predicted_in_scope": true,
+      "latency_ms": 20.91,
+      "scope_warning": null
+    },
+    {
+      "id": "scope_004",
+      "question": "What is BSA section 36 about?",
+      "expected_in_scope": true,
+      "predicted_in_scope": true,
+      "latency_ms": 10.79,
+      "scope_warning": null
+    },
+    {
+      "id": "scope_005",
+      "question": "Can police execute a warrant anywhere in India under BNSS?",
+      "expected_in_scope": true,
+      "predicted_in_scope": true,
+      "latency_ms": 22.66,
+      "scope_warning": null
+    },
+    {
+      "id": "scope_006",
+      "question": "What law applies if someone threatens me online?",
+      "expected_in_scope": true,
+      "predicted_in_scope": true,
+      "latency_ms": 20.37,
+      "scope_warning": null
+    },
+    {
+      "id": "scope_007",
+      "question": "How do I draft an FIR for phone theft?",
+      "expected_in_scope": true,
+      "predicted_in_scope": true,
+      "latency_ms": 22.75,
+      "scope_warning": null
+    },
+    {
+      "id": "scope_008",
+      "question": "What are my rights if police call me for questioning?",
+      "expected_in_scope": true,
+      "predicted_in_scope": true,
+      "latency_ms": 19.24,
+      "scope_warning": null
+    },
+    {
+      "id": "scope_009",
+      "question": "What is the punishment for theft under BNS?",
+      "expected_in_scope": true,
+      "predicted_in_scope": true,
+      "latency_ms": 24.03,
+      "scope_warning": null
+    },
+    {
+      "id": "scope_010",
+      "question": "What does BSA section 145 say?",
+      "expected_in_scope": true,
+      "predicted_in_scope": true,
+      "latency_ms": 10.97,
+      "scope_warning": null
+    },
+    {
+      "id": "scope_011",
+      "question": "what is my name?",
+      "expected_in_scope": false,
+      "predicted_in_scope": false,
+      "latency_ms": 0.06,
+      "scope_warning": "Ask a legal question about Indian statutes, BNS or IPC sections, FIRs, contracts, rights, judgments, or legal procedure. Embedding scope scores: legal=0.0, non-legal=1.0, corpus=0.0."
+    },
+    {
+      "id": "scope_012",
+      "question": "tell me a joke",
+      "expected_in_scope": false,
+      "predicted_in_scope": false,
+      "latency_ms": 0.02,
+      "scope_warning": "Ask a legal question about Indian statutes, BNS or IPC sections, FIRs, contracts, rights, judgments, or legal procedure. Embedding scope scores: legal=0.0, non-legal=1.0, corpus=0.0."
+    },
+    {
+      "id": "scope_013",
+      "question": "what is the weather in Lucknow?",
+      "expected_in_scope": false,
+      "predicted_in_scope": false,
+      "latency_ms": 0.03,
+      "scope_warning": "Ask a legal question about Indian statutes, BNS or IPC sections, FIRs, contracts, rights, judgments, or legal procedure. Embedding scope scores: legal=0.0, non-legal=1.0, corpus=0.0."
+    },
+    {
+      "id": "scope_014",
+      "question": "who won yesterday's cricket match?",
+      "expected_in_scope": false,
+      "predicted_in_scope": false,
+      "latency_ms": 0.03,
+      "scope_warning": "Ask a legal question about Indian statutes, BNS or IPC sections, FIRs, contracts, rights, judgments, or legal procedure. Embedding scope scores: legal=0.0, non-legal=1.0, corpus=0.0."
+    },
+    {
+      "id": "scope_015",
+      "question": "help me with React hooks",
+      "expected_in_scope": false,
+      "predicted_in_scope": false,
+      "latency_ms": 0.03,
+      "scope_warning": "Ask a legal question about Indian statutes, BNS or IPC sections, FIRs, contracts, rights, judgments, or legal procedure. Embedding scope scores: legal=0.0, non-legal=1.0, corpus=0.0."
+    },
+    {
+      "id": "scope_016",
+      "question": "suggest a dinner recipe",
+      "expected_in_scope": false,
+      "predicted_in_scope": false,
+      "latency_ms": 0.03,
+      "scope_warning": "Ask a legal question about Indian statutes, BNS or IPC sections, FIRs, contracts, rights, judgments, or legal procedure. Embedding scope scores: legal=0.0, non-legal=1.0, corpus=0.0."
+    },
+    {
+      "id": "scope_017",
+      "question": "translate hello into French",
+      "expected_in_scope": false,
+      "predicted_in_scope": false,
+      "latency_ms": 25.37,
+      "scope_warning": "Ask a legal question about Indian statutes, BNS or IPC sections, FIRs, contracts, rights, judgments, or legal procedure. Embedding scope scores: legal=0.0554, non-legal=0.1753, corpus=0.3523."
+    },
+    {
+      "id": "scope_018",
+      "question": "plan a trip to Goa",
+      "expected_in_scope": false,
+      "predicted_in_scope": false,
+      "latency_ms": 18.6,
+      "scope_warning": "Ask a legal question about Indian statutes, BNS or IPC sections, FIRs, contracts, rights, judgments, or legal procedure. Embedding scope scores: legal=0.1772, non-legal=0.2084, corpus=0.3816."
+    },
+    {
+      "id": "scope_019",
+      "question": "write a short romantic poem",
+      "expected_in_scope": false,
+      "predicted_in_scope": false,
+      "latency_ms": 0.05,
+      "scope_warning": "Ask a legal question about Indian statutes, BNS or IPC sections, FIRs, contracts, rights, judgments, or legal procedure. Embedding scope scores: legal=0.0, non-legal=1.0, corpus=0.0."
+    },
+    {
+      "id": "scope_020",
+      "question": "Write a legal-style poem about justice.",
+      "expected_in_scope": false,
+      "predicted_in_scope": true,
+      "latency_ms": 24.9,
+      "scope_warning": null
+    }
+  ],
+  "qa_rows": [
+    {
+      "id": "qa_001",
+      "question": "How many sections are there in BNS?",
+      "type": "structural",
+      "expected_source_citation": "India Code Act No. 45 of 2023",
+      "predicted_source_citations": [
+        "India Code Act No. 45 of 2023"
+      ],
+      "citation_rank": 1,
+      "answer": "The Bharatiya Nyaya Sanhita, 2023 contains 358 sections. This is based on the official India Code text, where the arrangement of sections runs from section 1 to section 358.",
+      "reasoning": "This answer is taken from the statute structure itself rather than from a penal-section mapping. For structural questions like this, NyayaSetu should use the official act text instead of retrieving unrelated offence provisions.",
+      "top1_hit": true,
+      "top3_hit": true,
+      "answer_keyword_match": true,
+      "missing_keywords": [],
+      "official_sources_only": true,
+      "hallucination_proxy": false,
+      "unsupported_answer": false,
+      "latency_ms": 0.03
+    },
+    {
+      "id": "qa_002",
+      "question": "How many sections are there in BNSS?",
+      "type": "structural",
+      "expected_source_citation": "India Code Act No. 46 of 2023",
+      "predicted_source_citations": [
+        "India Code Act No. 46 of 2023"
+      ],
+      "citation_rank": 1,
+      "answer": "The Bharatiya Nagarik Suraksha Sanhita, 2023 contains 531 sections. This is based on the official India Code text, where the statute runs from section 1 to section 531.",
+      "reasoning": "This answer is taken from the statute structure itself rather than semantic retrieval. For structural questions, NyayaSetu should use the official act text directly.",
+      "top1_hit": true,
+      "top3_hit": true,
+      "answer_keyword_match": true,
+      "missing_keywords": [],
+      "official_sources_only": true,
+      "hallucination_proxy": false,
+      "unsupported_answer": false,
+      "latency_ms": 0.01
+    },
+    {
+      "id": "qa_003",
+      "question": "How many sections are there in BSA?",
+      "type": "structural",
+      "expected_source_citation": "India Code Act No. 47 of 2023",
+      "predicted_source_citations": [
+        "India Code Act No. 47 of 2023"
+      ],
+      "citation_rank": 1,
+      "answer": "The Bharatiya Sakshya Adhiniyam, 2023 contains 170 sections. This is based on the official India Code text, where the statute runs from section 1 to section 170.",
+      "reasoning": "This answer is taken from the statute structure itself rather than semantic retrieval. For structural questions, NyayaSetu should use the official act text directly.",
+      "top1_hit": true,
+      "top3_hit": true,
+      "answer_keyword_match": true,
+      "missing_keywords": [],
+      "official_sources_only": true,
+      "hallucination_proxy": false,
+      "unsupported_answer": false,
+      "latency_ms": 0.05
+    },
+    {
+      "id": "qa_004",
+      "question": "Explain theft under BNS.",
+      "type": "semantic_grounding",
+      "expected_source_citation": "Act No. 45 of 2023 | Section 303",
+      "predicted_source_citations": [
+        "Act No. 45 of 2023 | Section 309(2)",
+        "Act No. 45 of 2023 | Section 304",
+        "Act No. 45 of 2023 | Section 307"
+      ],
+      "citation_rank": null,
+      "answer": "(2) Theft is robbery if, in order to the committing of the theft, or in committing the theft, or in \ncarrying away or attempting to carry away property obtained by the theft, the offender, for that end \nvoluntarily causes or attempts to cause to any person death or hurt or wrongf",
+      "reasoning": "NyayaSetu is currently in retrieval-first mode, so this response is composed directly from the most relevant indexed legal source instead of a separate generation model.",
+      "top1_hit": false,
+      "top3_hit": false,
+      "answer_keyword_match": false,
+      "missing_keywords": [
+        "movable property"
+      ],
+      "official_sources_only": true,
+      "hallucination_proxy": true,
+      "unsupported_answer": true,
+      "latency_ms": 19.49
+    },
+    {
+      "id": "qa_exact_001",
+      "question": "What does Section 5 of BNS say?",
+      "type": "exact_section",
+      "expected_source_citation": "Act No. 45 of 2023 | Section 5",
+      "predicted_source_citations": [
+        "Act No. 45 of 2023 | Section 5",
+        "Act No. 45 of 2023 | Section 5"
+      ],
+      "citation_rank": 1,
+      "answer": "Based on the retrieved legal material, the closest match is Act No. 45 of 2023 | Section 5. 5. Commutation of sentence. \u2014The appropriate Government may, without the consent of the \noffender, commute any punishment under this Sanhita to any other punishment in accordance \nwith section 474 of the Bharatiya Nagarik Suraksha Sanhita, 2023. \nExplanation.\u2014For the purposes of ",
+      "reasoning": "NyayaSetu is currently in retrieval-first mode, so this response is composed directly from the most relevant indexed legal source instead of a separate generation model.",
+      "top1_hit": true,
+      "top3_hit": true,
+      "answer_keyword_match": true,
+      "missing_keywords": [],
+      "official_sources_only": true,
+      "hallucination_proxy": false,
+      "unsupported_answer": false,
+      "latency_ms": 11.18
+    },
+    {
+      "id": "qa_exact_002",
+      "question": "What does Section 6 of BNS say?",
+      "type": "exact_section",
+      "expected_source_citation": "Act No. 45 of 2023 | Section 6",
+      "predicted_source_citations": [
+        "Act No. 45 of 2023 | Section 6",
+        "Act No. 45 of 2023 | Section 6"
+      ],
+      "citation_rank": 1,
+      "answer": "Based on the retrieved legal material, the closest match is Act No. 45 of 2023 | Section 6. 6. Fractions of terms of punishment .\u2014In calculating fractions of terms of punishment, \nimprisonment for life shall be reckoned as equivalent to imprisonment for twenty years unless otherwise \nprovided.",
+      "reasoning": "NyayaSetu is currently in retrieval-first mode, so this response is composed directly from the most relevant indexed legal source instead of a separate generation model.",
+      "top1_hit": true,
+      "top3_hit": true,
+      "answer_keyword_match": true,
+      "missing_keywords": [],
+      "official_sources_only": true,
+      "hallucination_proxy": false,
+      "unsupported_answer": false,
+      "latency_ms": 10.64
+    },
+    {
+      "id": "qa_exact_003",
+      "question": "What does Section 7 of BNS say?",
+      "type": "exact_section",
+      "expected_source_citation": "Act No. 45 of 2023 | Section 7",
+      "predicted_source_citations": [
+        "Act No. 45 of 2023 | Section 7",
+        "Act No. 45 of 2023 | Section 7"
+      ],
+      "citation_rank": 1,
+      "answer": "Based on the retrieved legal material, the closest match is Act No. 45 of 2023 | Section 7. 7. Sentence may be (in certain cases of imprisonment) wholly or partly rigorous or simple .\u2014In \nevery case in which an offender is punishable with imprisonment which may be of either description, it \nshall be competent to the Court which sentences such offender to direct in the s",
+      "reasoning": "NyayaSetu is currently in retrieval-first mode, so this response is composed directly from the most relevant indexed legal source instead of a separate generation model.",
+      "top1_hit": true,
+      "top3_hit": true,
+      "answer_keyword_match": true,
+      "missing_keywords": [],
+      "official_sources_only": true,
+      "hallucination_proxy": false,
+      "unsupported_answer": false,
+      "latency_ms": 10.5
+    },
+    {
+      "id": "qa_exact_004",
+      "question": "What does Section 9 of BNS say?",
+      "type": "exact_section",
+      "expected_source_citation": "Act No. 45 of 2023 | Section 9",
+      "predicted_source_citations": [
+        "Act No. 45 of 2023 | Section 9",
+        "Act No. 45 of 2023 | Section 9"
+      ],
+      "citation_rank": 1,
+      "answer": "Based on the retrieved legal material, the closest match is Act No. 45 of 2023 | Section 9. 9. Limit of punishment of offence made up of several offences .\u2014(1) Where anything which is an \noffence is made up of parts, any of which parts is itself an offence, the offender shall not be punished \nwith the punishment of more than one of such his offences, unless it be so exp",
+      "reasoning": "NyayaSetu is currently in retrieval-first mode, so this response is composed directly from the most relevant indexed legal source instead of a separate generation model.",
+      "top1_hit": true,
+      "top3_hit": true,
+      "answer_keyword_match": true,
+      "missing_keywords": [],
+      "official_sources_only": true,
+      "hallucination_proxy": false,
+      "unsupported_answer": false,
+      "latency_ms": 11.08
+    },
+    {
+      "id": "qa_exact_005",
+      "question": "What does Section 10 of BNS say?",
+      "type": "exact_section",
+      "expected_source_citation": "Act No. 45 of 2023 | Section 10",
+      "predicted_source_citations": [
+        "Act No. 45 of 2023 | Section 10"
+      ],
+      "citation_rank": 1,
+      "answer": "Based on the retrieved legal material, the closest match is Act No. 45 of 2023 | Section 10. 10. Punishment of person guilty of one of several offences, judgment stating that it is doubtful \nof which .\u2014In all cases in which judgment is given that a person is guilty of one of several offences \nspecified in the judgment, but that it is doubtful of which of these offences h",
+      "reasoning": "NyayaSetu is currently in retrieval-first mode, so this response is composed directly from the most relevant indexed legal source instead of a separate generation model.",
+      "top1_hit": true,
+      "top3_hit": true,
+      "answer_keyword_match": true,
+      "missing_keywords": [],
+      "official_sources_only": true,
+      "hallucination_proxy": false,
+      "unsupported_answer": false,
+      "latency_ms": 10.97
+    },
+    {
+      "id": "qa_exact_006",
+      "question": "What does Section 11 of BNS say?",
+      "type": "exact_section",
+      "expected_source_citation": "Act No. 45 of 2023 | Section 11",
+      "predicted_source_citations": [
+        "Act No. 45 of 2023 | Section 11"
+      ],
+      "citation_rank": 1,
+      "answer": "Based on the retrieved legal material, the closest match is Act No. 45 of 2023 | Section 11. 11. Solitary confinement.\u2014Whenever any person is convicted of an offence for which under this \nSanhita the Court has power to sentence him to rigorous imprisonment, the Court may, by its sentence, \n\norder that the offender shall be kept in solitary confinement for any portion or ",
+      "reasoning": "NyayaSetu is currently in retrieval-first mode, so this response is composed directly from the most relevant indexed legal source instead of a separate generation model.",
+      "top1_hit": true,
+      "top3_hit": true,
+      "answer_keyword_match": true,
+      "missing_keywords": [],
+      "official_sources_only": true,
+      "hallucination_proxy": false,
+      "unsupported_answer": false,
+      "latency_ms": 10.43
+    },
+    {
+      "id": "qa_exact_007",
+      "question": "What does Section 12 of BNS say?",
+      "type": "exact_section",
+      "expected_source_citation": "Act No. 45 of 2023 | Section 12",
+      "predicted_source_citations": [
+        "Act No. 45 of 2023 | Section 12"
+      ],
+      "citation_rank": 1,
+      "answer": "Based on the retrieved legal material, the closest match is Act No. 45 of 2023 | Section 12. 12. Limit of solitary confinement .\u2014In executing a sentence of solitary confinement, such \nconfinement shall in no case exceed fourteen days at a time, with intervals between the periods of solitary \nconfinement of not less duration than such periods; and when the imprisonment aw",
+      "reasoning": "NyayaSetu is currently in retrieval-first mode, so this response is composed directly from the most relevant indexed legal source instead of a separate generation model.",
+      "top1_hit": true,
+      "top3_hit": true,
+      "answer_keyword_match": true,
+      "missing_keywords": [],
+      "official_sources_only": true,
+      "hallucination_proxy": false,
+      "unsupported_answer": false,
+      "latency_ms": 10.58
+    },
+    {
+      "id": "qa_exact_008",
+      "question": "What does Section 13 of BNS say?",
+      "type": "exact_section",
+      "expected_source_citation": "Act No. 45 of 2023 | Section 13",
+      "predicted_source_citations": [
+        "Act No. 45 of 2023 | Section 13"
+      ],
+      "citation_rank": 1,
+      "answer": "Based on the retrieved legal material, the closest match is Act No. 45 of 2023 | Section 13. 13. Enhanced punishment for certain offences after previous conviction.\u2014Whoever, having been \nconvicted by a Court in India, of an offence punishable under Chapter X or Chapter XVII of this Sanhita \nwith imprisonment of either description for a term of three years or upwards, sha",
+      "reasoning": "NyayaSetu is currently in retrieval-first mode, so this response is composed directly from the most relevant indexed legal source instead of a separate generation model.",
+      "top1_hit": true,
+      "top3_hit": true,
+      "answer_keyword_match": true,
+      "missing_keywords": [],
+      "official_sources_only": true,
+      "hallucination_proxy": false,
+      "unsupported_answer": false,
+      "latency_ms": 10.39
+    },
+    {
+      "id": "qa_exact_009",
+      "question": "What does Section 14 of BNS say?",
+      "type": "exact_section",
+      "expected_source_citation": "Act No. 45 of 2023 | Section 14",
+      "predicted_source_citations": [
+        "Act No. 45 of 2023 | Section 14"
+      ],
+      "citation_rank": 1,
+      "answer": "Based on the retrieved legal material, the closest match is Act No. 45 of 2023 | Section 14. 14. Act done by a person bound, or by mistake of fact believing himself bound, by law .\u2014\nNothing is an offence which is done by a person who is, or who by reason of a mistake of fact and not by \nreason of a mistake of law in good faith believes himself to be, bound by law to do i",
+      "reasoning": "NyayaSetu is currently in retrieval-first mode, so this response is composed directly from the most relevant indexed legal source instead of a separate generation model.",
+      "top1_hit": true,
+      "top3_hit": true,
+      "answer_keyword_match": true,
+      "missing_keywords": [],
+      "official_sources_only": true,
+      "hallucination_proxy": false,
+      "unsupported_answer": false,
+      "latency_ms": 10.71
+    },
+    {
+      "id": "qa_exact_010",
+      "question": "What does Section 2 of BNSS say?",
+      "type": "exact_section",
+      "expected_source_citation": "Act No. 46 of 2023 | Section 2",
+      "predicted_source_citations": [
+        "Act No. 46 of 2023 | Section 2"
+      ],
+      "citation_rank": 1,
+      "answer": "Based on the retrieved legal material, the closest match is Act No. 46 of 2023 | Section 2. 2. Definitions.\u2014(1) In this Sanhita, unless the context otherwise requires,\u2014 \n(a) \u201caudio-video electronic\u201d means shall include use of any communication device for the \npurposes of video conferencing, recording of processes of identification, search and seizure or \nevidence, trans",
+      "reasoning": "NyayaSetu is currently in retrieval-first mode, so this response is composed directly from the most relevant indexed legal source instead of a separate generation model.",
+      "top1_hit": true,
+      "top3_hit": true,
+      "answer_keyword_match": true,
+      "missing_keywords": [],
+      "official_sources_only": true,
+      "hallucination_proxy": false,
+      "unsupported_answer": false,
+      "latency_ms": 9.85
+    },
+    {
+      "id": "qa_exact_011",
+      "question": "What does Section 1 of BNSS say?",
+      "type": "exact_section",
+      "expected_source_citation": "Act No. 46 of 2023 | Section 1",
+      "predicted_source_citations": [
+        "Act No. 46 of 2023 | Section 1",
+        "Act No. 46 of 2023 | Section 1",
+        "Act No. 46 of 2023 | Section 1"
+      ],
+      "citation_rank": 1,
+      "answer": "Based on the retrieved legal material, the closest match is Act No. 46 of 2023 | Section 1. 1. 1st July, 2024, [except the provisions of the entry relation to Section 106(2) in the first Schedule], vide notification No. S.O. \n848(E), dated, 23rd day of February, 2024, see Gazette of India, Extraordinary, Part II, sec. 3(ii). \n\n(g) \u201ccognizable offence\u201d means an offence f",
+      "reasoning": "NyayaSetu is currently in retrieval-first mode, so this response is composed directly from the most relevant indexed legal source instead of a separate generation model.",
+      "top1_hit": true,
+      "top3_hit": true,
+      "answer_keyword_match": true,
+      "missing_keywords": [],
+      "official_sources_only": true,
+      "hallucination_proxy": false,
+      "unsupported_answer": false,
+      "latency_ms": 9.99
+    },
+    {
+      "id": "qa_exact_012",
+      "question": "What does Section 3 of BNSS say?",
+      "type": "exact_section",
+      "expected_source_citation": "Act No. 46 of 2023 | Section 3",
+      "predicted_source_citations": [
+        "Act No. 46 of 2023 | Section 3",
+        "Act No. 46 of 2023 | Section 3"
+      ],
+      "citation_rank": 1,
+      "answer": "Based on the retrieved legal material, the closest match is Act No. 46 of 2023 | Section 3. 3. Construction of references.\u2014(1) Unless the context otherwise requires, any reference in any law, \nto a Magistrate without any qualifying words, Magistrate of the first class or a Magistrate of the second \nclass shall, in relation to any area, be construed as a reference to a J",
+      "reasoning": "NyayaSetu is currently in retrieval-first mode, so this response is composed directly from the most relevant indexed legal source instead of a separate generation model.",
+      "top1_hit": true,
+      "top3_hit": true,
+      "answer_keyword_match": true,
+      "missing_keywords": [],
+      "official_sources_only": true,
+      "hallucination_proxy": false,
+      "unsupported_answer": false,
+      "latency_ms": 10.19
+    },
+    {
+      "id": "qa_exact_013",
+      "question": "What does Section 4 of BNSS say?",
+      "type": "exact_section",
+      "expected_source_citation": "Act No. 46 of 2023 | Section 4",
+      "predicted_source_citations": [
+        "Act No. 46 of 2023 | Section 4"
+      ],
+      "citation_rank": 1,
+      "answer": "Based on the retrieved legal material, the closest match is Act No. 46 of 2023 | Section 4. 4. Trial of offences under Bharatiya Nyaya Sanhita, 2023 and other laws.\u2014(1) All offences under \nthe Bharatiya Nyaya Sanhita, 2023 shall be investigated, inquired into, tried, and otherwise dealt with \naccording to the provisions hereinafter contained. \n(2) All offences under any",
+      "reasoning": "NyayaSetu is currently in retrieval-first mode, so this response is composed directly from the most relevant indexed legal source instead of a separate generation model.",
+      "top1_hit": true,
+      "top3_hit": true,
+      "answer_keyword_match": true,
+      "missing_keywords": [],
+      "official_sources_only": true,
+      "hallucination_proxy": false,
+      "unsupported_answer": false,
+      "latency_ms": 10.65
+    },
+    {
+      "id": "qa_exact_014",
+      "question": "What does Section 5 of BNSS say?",
+      "type": "exact_section",
+      "expected_source_citation": "Act No. 46 of 2023 | Section 5",
+      "predicted_source_citations": [
+        "Act No. 46 of 2023 | Section 5"
+      ],
+      "citation_rank": 1,
+      "answer": "Based on the retrieved legal material, the closest match is Act No. 46 of 2023 | Section 5. 5. Saving.\u2014Nothing contained in this Sanhita shall, in the absence of a specific provision to the \ncontrary, affect any special or local law for the time being in force, or any special jurisdiction or power \nconferred, or any special form of procedure prescribed, by any other law",
+      "reasoning": "NyayaSetu is currently in retrieval-first mode, so this response is composed directly from the most relevant indexed legal source instead of a separate generation model.",
+      "top1_hit": true,
+      "top3_hit": true,
+      "answer_keyword_match": true,
+      "missing_keywords": [],
+      "official_sources_only": true,
+      "hallucination_proxy": false,
+      "unsupported_answer": false,
+      "latency_ms": 9.9
+    },
+    {
+      "id": "qa_exact_015",
+      "question": "What does Section 6 of BNSS say?",
+      "type": "exact_section",
+      "expected_source_citation": "Act No. 46 of 2023 | Section 6",
+      "predicted_source_citations": [
+        "Act No. 46 of 2023 | Section 6"
+      ],
+      "citation_rank": 1,
+      "answer": "Based on the retrieved legal material, the closest match is Act No. 46 of 2023 | Section 6. 6. Classes of Criminal Courts.\u2014 Besides the High Courts and the Courts constituted under any law, \nother than this Sanhita, there shall be, in every State, the following classes of Criminal Courts, namely:\u2014 \n(i) Courts of Session; \n(ii) Judicial Magistrates of the first class; \n(",
+      "reasoning": "NyayaSetu is currently in retrieval-first mode, so this response is composed directly from the most relevant indexed legal source instead of a separate generation model.",
+      "top1_hit": true,
+      "top3_hit": true,
+      "answer_keyword_match": true,
+      "missing_keywords": [],
+      "official_sources_only": true,
+      "hallucination_proxy": false,
+      "unsupported_answer": false,
+      "latency_ms": 11.52
+    },
+    {
+      "id": "qa_exact_016",
+      "question": "What does Section 11 of BNSS say?",
+      "type": "exact_section",
+      "expected_source_citation": "Act No. 46 of 2023 | Section 11",
+      "predicted_source_citations": [
+        "Act No. 46 of 2023 | Section 11"
+      ],
+      "citation_rank": 1,
+      "answer": "Based on the retrieved legal material, the closest match is Act No. 46 of 2023 | Section 11. 11. Special Judicial Magistrates. \u2014(1) The High Court may, if requested by the Central or State \nGovernment so to do, confer upon any person who holds or has held any post under the Government, all or \nany of the powers conferred or conferrable by or under this Sanhita on a Judic",
+      "reasoning": "NyayaSetu is currently in retrieval-first mode, so this response is composed directly from the most relevant indexed legal source instead of a separate generation model.",
+      "top1_hit": true,
+      "top3_hit": true,
+      "answer_keyword_match": true,
+      "missing_keywords": [],
+      "official_sources_only": true,
+      "hallucination_proxy": false,
+      "unsupported_answer": false,
+      "latency_ms": 10.39
+    },
+    {
+      "id": "qa_exact_017",
+      "question": "What does Section 13 of BNSS say?",
+      "type": "exact_section",
+      "expected_source_citation": "Act No. 46 of 2023 | Section 13",
+      "predicted_source_citations": [
+        "Act No. 46 of 2023 | Section 13"
+      ],
+      "citation_rank": 1,
+      "answer": "Based on the retrieved legal material, the closest match is Act No. 46 of 2023 | Section 13. 13. Subordination of Judicial Magistrates.\u2014(1) Every Chief Judicial Magistrate shall be subordinate \nto the Sessions Judge; and every other Judicial Magistrate shall, subject to the general control of the \nSessions Judge, be subordinate to the Chief Judicial Magistrate. \n(2) The ",
+      "reasoning": "NyayaSetu is currently in retrieval-first mode, so this response is composed directly from the most relevant indexed legal source instead of a separate generation model.",
+      "top1_hit": true,
+      "top3_hit": true,
+      "answer_keyword_match": true,
+      "missing_keywords": [],
+      "official_sources_only": true,
+      "hallucination_proxy": false,
+      "unsupported_answer": false,
+      "latency_ms": 10.73
+    },
+    {
+      "id": "qa_exact_018",
+      "question": "What does Section 15 of BNSS say?",
+      "type": "exact_section",
+      "expected_source_citation": "Act No. 46 of 2023 | Section 15",
+      "predicted_source_citations": [
+        "Act No. 46 of 2023 | Section 15"
+      ],
+      "citation_rank": 1,
+      "answer": "Based on the retrieved legal material, the closest match is Act No. 46 of 2023 | Section 15. 15. Special Executive Magistrates. \u2014The State Government may appoint, for such term as it may \nthink fit, Executive Magistrates or any police officer not below the rank of Superintendent of Police or \nequivalent, to be known as Special Executive Magistrates, for particular areas ",
+      "reasoning": "NyayaSetu is currently in retrieval-first mode, so this response is composed directly from the most relevant indexed legal source instead of a separate generation model.",
+      "top1_hit": true,
+      "top3_hit": true,
+      "answer_keyword_match": true,
+      "missing_keywords": [],
+      "official_sources_only": true,
+      "hallucination_proxy": false,
+      "unsupported_answer": false,
+      "latency_ms": 10.29
+    },
+    {
+      "id": "qa_exact_019",
+      "question": "What does Section 2 of BSA say?",
+      "type": "exact_section",
+      "expected_source_citation": "Act No. 47 of 2023 | Section 2",
+      "predicted_source_citations": [
+        "Act No. 47 of 2023 | Section 2",
+        "Act No. 47 of 2023 | Section 2",
+        "Act No. 47 of 2023 | Section 2"
+      ],
+      "citation_rank": 1,
+      "answer": "Based on the retrieved legal material, the closest match is Act No. 47 of 2023 | Section 2. 2. Definitions.\u2014 (1) In this Adhiniyam, unless the context otherwise requires,\u2014 \n(a) \u201cCourt\u201d includes all Judges and Magistrates, and all persons, except arbitrators, legally \nauthorised to take evidence; \n(b) \u201cconclusive proof\u201d means when one fact is declared by this Adhiniyam t",
+      "reasoning": "NyayaSetu is currently in retrieval-first mode, so this response is composed directly from the most relevant indexed legal source instead of a separate generation model.",
+      "top1_hit": true,
+      "top3_hit": true,
+      "answer_keyword_match": true,
+      "missing_keywords": [],
+      "official_sources_only": true,
+      "hallucination_proxy": false,
+      "unsupported_answer": false,
+      "latency_ms": 10.37
+    },
+    {
+      "id": "qa_exact_020",
+      "question": "What does Section 1 of BSA say?",
+      "type": "exact_section",
+      "expected_source_citation": "Act No. 47 of 2023 | Section 1",
+      "predicted_source_citations": [
+        "Act No. 47 of 2023 | Section 1",
+        "Act No. 47 of 2023 | Section 1",
+        "Act No. 47 of 2023 | Section 1"
+      ],
+      "citation_rank": 1,
+      "answer": "Based on the retrieved legal material, the closest match is Act No. 47 of 2023 | Section 1. ently, or uses a particular word in a particular sense, or is or was at a specified time \nconscious of a particular sensation, is a fact; \n(g) \u201cfacts in issue\u201d means and includes any fact from which, either by itself or in connection \nwith other facts, the existence, non -existen",
+      "reasoning": "NyayaSetu is currently in retrieval-first mode, so this response is composed directly from the most relevant indexed legal source instead of a separate generation model.",
+      "top1_hit": true,
+      "top3_hit": true,
+      "answer_keyword_match": true,
+      "missing_keywords": [],
+      "official_sources_only": true,
+      "hallucination_proxy": false,
+      "unsupported_answer": false,
+      "latency_ms": 7.92
+    },
+    {
+      "id": "qa_exact_021",
+      "question": "What does Section 3 of BSA say?",
+      "type": "exact_section",
+      "expected_source_citation": "Act No. 47 of 2023 | Section 3",
+      "predicted_source_citations": [
+        "Act No. 47 of 2023 | Section 3",
+        "Act No. 47 of 2023 | Section 3"
+      ],
+      "citation_rank": 1,
+      "answer": "Based on the retrieved legal material, the closest match is Act No. 47 of 2023 | Section 3. 3. Evidence may be given of facts in issue and relevant facts.\u2014 Evidence may be given in any suit \nor proceeding of the existence or non -existence of every fact in issue and of such other facts as are \nhereinafter declared to be relevant, and of no others. \nExplanation.\u2014This sec",
+      "reasoning": "NyayaSetu is currently in retrieval-first mode, so this response is composed directly from the most relevant indexed legal source instead of a separate generation model.",
+      "top1_hit": true,
+      "top3_hit": true,
+      "answer_keyword_match": true,
+      "missing_keywords": [],
+      "official_sources_only": true,
+      "hallucination_proxy": false,
+      "unsupported_answer": false,
+      "latency_ms": 8.1
+    },
+    {
+      "id": "qa_exact_022",
+      "question": "What does Section 4 of BSA say?",
+      "type": "exact_section",
+      "expected_source_citation": "Act No. 47 of 2023 | Section 4",
+      "predicted_source_citations": [
+        "Act No. 47 of 2023 | Section 4",
+        "Act No. 47 of 2023 | Section 4",
+        "Act No. 47 of 2023 | Section 4"
+      ],
+      "citation_rank": 1,
+      "answer": "Based on the retrieved legal material, the closest match is Act No. 47 of 2023 | Section 4. 4. Relevancy of facts forming part of same transaction. \u2014Facts which, though not in issue, are so \nconnected with a fact in issue or a relevant fact as to form part of the same transaction, are relevant, \nwhether they occurred at the same time and place or at different times and ",
+      "reasoning": "NyayaSetu is currently in retrieval-first mode, so this response is composed directly from the most relevant indexed legal source instead of a separate generation model.",
+      "top1_hit": true,
+      "top3_hit": true,
+      "answer_keyword_match": true,
+      "missing_keywords": [],
+      "official_sources_only": true,
+      "hallucination_proxy": false,
+      "unsupported_answer": false,
+      "latency_ms": 8.57
+    },
+    {
+      "id": "qa_exact_023",
+      "question": "What does Section 5 of BSA say?",
+      "type": "exact_section",
+      "expected_source_citation": "Act No. 47 of 2023 | Section 5",
+      "predicted_source_citations": [
+        "Act No. 47 of 2023 | Section 5",
+        "Act No. 47 of 2023 | Section 5"
+      ],
+      "citation_rank": 1,
+      "answer": "Based on the retrieved legal material, the closest match is Act No. 47 of 2023 | Section 5. 5. Facts which are occasion, cause or effect of facts in issue or relevant facts. \u2014 Facts which are \nthe occasion, cause or effect, immediate or otherwise, of relevant facts, or facts in issue, or which \nconstitute the state of things under which they happened, or which afforded ",
+      "reasoning": "NyayaSetu is currently in retrieval-first mode, so this response is composed directly from the most relevant indexed legal source instead of a separate generation model.",
+      "top1_hit": true,
+      "top3_hit": true,
+      "answer_keyword_match": true,
+      "missing_keywords": [],
+      "official_sources_only": true,
+      "hallucination_proxy": false,
+      "unsupported_answer": false,
+      "latency_ms": 10.34
+    },
+    {
+      "id": "qa_exact_024",
+      "question": "What does Section 6 of BSA say?",
+      "type": "exact_section",
+      "expected_source_citation": "Act No. 47 of 2023 | Section 6",
+      "predicted_source_citations": [
+        "Act No. 47 of 2023 | Section 6",
+        "Act No. 47 of 2023 | Section 6",
+        "Act No. 47 of 2023 | Section 6"
+      ],
+      "citation_rank": 1,
+      "answer": "Based on the retrieved legal material, the closest match is Act No. 47 of 2023 | Section 6. 6. Motive, preparation and previous or subsequent conduct .\u2014(1) Any fact is relevant which \nshows or constitutes a motive or preparation for any fact in issue or relevant fact. \n(2) The conduct of any party, or of any agent to any party, to any suit or proceeding, in reference to",
+      "reasoning": "NyayaSetu is currently in retrieval-first mode, so this response is composed directly from the most relevant indexed legal source instead of a separate generation model.",
+      "top1_hit": true,
+      "top3_hit": true,
+      "answer_keyword_match": true,
+      "missing_keywords": [],
+      "official_sources_only": true,
+      "hallucination_proxy": false,
+      "unsupported_answer": false,
+      "latency_ms": 12.01
+    },
+    {
+      "id": "qa_exact_025",
+      "question": "What does Section 7 of BSA say?",
+      "type": "exact_section",
+      "expected_source_citation": "Act No. 47 of 2023 | Section 7",
+      "predicted_source_citations": [
+        "Act No. 47 of 2023 | Section 7",
+        "Act No. 47 of 2023 | Section 7",
+        "Act No. 47 of 2023 | Section 7"
+      ],
+      "citation_rank": 1,
+      "answer": "Based on the retrieved legal material, the closest match is Act No. 47 of 2023 | Section 7. 7. Facts necessary to explain or introduce fact in issue or relevant facts .\u2014Facts necessary to \nexplain or introduce a fact in issue or relevant fact, or which support or rebut an inference suggested by a \nfact in issue or a relevant fact, or which establish the identity of anyt",
+      "reasoning": "NyayaSetu is currently in retrieval-first mode, so this response is composed directly from the most relevant indexed legal source instead of a separate generation model.",
+      "top1_hit": true,
+      "top3_hit": true,
+      "answer_keyword_match": true,
+      "missing_keywords": [],
+      "official_sources_only": true,
+      "hallucination_proxy": false,
+      "unsupported_answer": false,
+      "latency_ms": 10.38
+    },
+    {
+      "id": "qa_exact_026",
+      "question": "What does Section 8 of BSA say?",
+      "type": "exact_section",
+      "expected_source_citation": "Act No. 47 of 2023 | Section 8",
+      "predicted_source_citations": [
+        "Act No. 47 of 2023 | Section 8",
+        "Act No. 47 of 2023 | Section 8"
+      ],
+      "citation_rank": 1,
+      "answer": "Based on the retrieved legal material, the closest match is Act No. 47 of 2023 | Section 8. 8. Things said or done by conspirator in reference to common design .\u2014Where there is \nreasonable ground to believe that two or more persons have conspired together to commit an offence or \nan actionable wrong, anything said, done or written by any one of such persons in reference",
+      "reasoning": "NyayaSetu is currently in retrieval-first mode, so this response is composed directly from the most relevant indexed legal source instead of a separate generation model.",
+      "top1_hit": true,
+      "top3_hit": true,
+      "answer_keyword_match": true,
+      "missing_keywords": [],
+      "official_sources_only": true,
+      "hallucination_proxy": false,
+      "unsupported_answer": false,
+      "latency_ms": 12.36
+    },
+    {
+      "id": "qa_exact_027",
+      "question": "What does Section 10 of BSA say?",
+      "type": "exact_section",
+      "expected_source_citation": "Act No. 47 of 2023 | Section 10",
+      "predicted_source_citations": [
+        "Act No. 47 of 2023 | Section 10"
+      ],
+      "citation_rank": 1,
+      "answer": "Based on the retrieved legal material, the closest match is Act No. 47 of 2023 | Section 10. 10. Facts tending to enable Court to determine amount are relevant in suits for damages .\u2014In \nsuits in which damages are claimed, any fact which will enable the Court to determine the amount of \ndamages which ought to be awarded, is relevant.",
+      "reasoning": "NyayaSetu is currently in retrieval-first mode, so this response is composed directly from the most relevant indexed legal source instead of a separate generation model.",
+      "top1_hit": true,
+      "top3_hit": true,
+      "answer_keyword_match": true,
+      "missing_keywords": [],
+      "official_sources_only": true,
+      "hallucination_proxy": false,
+      "unsupported_answer": false,
+      "latency_ms": 8.22
+    }
+  ],
+  "classifier_rows": [
+    {
+      "id": "clf_001",
+      "incident_description": "Someone stole my phone from the market while I was shopping.",
+      "expected_title": "Theft",
+      "predicted_title": "Theft",
+      "predicted_section": "BNS - Theft",
+      "confidence": 0.75,
+      "reasoning": "The complaint describes unauthorized taking of movable property from the complainant.",
+      "correct": true,
+      "latency_ms": 30.99
+    },
+    {
+      "id": "clf_002",
+      "incident_description": "My wallet was stolen on the bus by an unknown person.",
+      "expected_title": "Theft",
+      "predicted_title": "Theft",
+      "predicted_section": "BNS - Theft",
+      "confidence": 0.85,
+      "reasoning": "The complaint describes unauthorized taking of movable property from the complainant.",
+      "correct": true,
+      "latency_ms": 33.4
+    },
+    {
+      "id": "clf_003",
+      "incident_description": "A man threatened to kill me if I filed a complaint.",
+      "expected_title": "Criminal Intimidation",
+      "predicted_title": "Criminal Intimidation",
+      "predicted_section": "BNS - Criminal Intimidation",
+      "confidence": 0.85,
+      "reasoning": "The complaint describes threats intended to cause alarm or coerce the complainant.",
+      "correct": true,
+      "latency_ms": 30.1
+    },
+    {
+      "id": "clf_004",
+      "incident_description": "I was cheated in an online investment scam and lost my money.",
+      "expected_title": "Cheating",
+      "predicted_title": "Cheating",
+      "predicted_section": "BNS - Cheating",
+      "confidence": 0.95,
+      "reasoning": "The complaint suggests deception or dishonest inducement leading to wrongful loss.",
+      "correct": true,
+      "latency_ms": 31.0
+    },
+    {
+      "id": "clf_005",
+      "incident_description": "My neighbor hit me with a stick and caused injury.",
+      "expected_title": "Voluntarily Causing Hurt / Assault",
+      "predicted_title": "Voluntarily Causing Hurt / Assault",
+      "predicted_section": "BNS - Hurt / Assault",
+      "confidence": 0.75,
+      "reasoning": "The complaint includes physical violence or bodily injury.",
+      "correct": true,
+      "latency_ms": 23.91
+    },
+    {
+      "id": "clf_006",
+      "incident_description": "A man kept stalking and sexually harassing me near my office.",
+      "expected_title": "Sexual Harassment / Stalking",
+      "predicted_title": "Sexual Harassment / Stalking",
+      "predicted_section": "BNS - Sexual Harassment / Stalking",
+      "confidence": 0.85,
+      "reasoning": "The complaint indicates unwelcome sexual conduct, harassment, or repeated following/contact.",
+      "correct": true,
+      "latency_ms": 19.35
+    },
+    {
+      "id": "clf_007",
+      "incident_description": "Someone entered my house without permission and refused to leave.",
+      "expected_title": "Criminal Trespass",
+      "predicted_title": "Criminal Trespass",
+      "predicted_section": "BNS - Criminal Trespass",
+      "confidence": 0.75,
+      "reasoning": "The complaint suggests unlawful entry into property or premises.",
+      "correct": true,
+      "latency_ms": 32.68
+    },
+    {
+      "id": "clf_008",
+      "incident_description": "Unknown persons vandalized my car and broke the windshield.",
+      "expected_title": "Mischief / Property Damage",
+      "predicted_title": "Mischief / Property Damage",
+      "predicted_section": "BNS - Mischief / Property Damage",
+      "confidence": 0.75,
+      "reasoning": "The complaint involves damage or destruction of property.",
+      "correct": true,
+      "latency_ms": 26.09
+    },
+    {
+      "id": "clf_009",
+      "incident_description": "My bike was stolen from outside the metro station.",
+      "expected_title": "Theft",
+      "predicted_title": "Theft",
+      "predicted_section": "BNS - Theft",
+      "confidence": 0.85,
+      "reasoning": "The complaint describes unauthorized taking of movable property from the complainant.",
+      "correct": true,
+      "latency_ms": 31.29
+    },
+    {
+      "id": "clf_010",
+      "incident_description": "The caller threatened to leak my data unless I paid him.",
+      "expected_title": "Criminal Intimidation",
+      "predicted_title": "Criminal Intimidation",
+      "predicted_section": "BNS - Criminal Intimidation",
+      "confidence": 0.75,
+      "reasoning": "The complaint describes threats intended to cause alarm or coerce the complainant.",
+      "correct": true,
+      "latency_ms": 24.59
+    },
+    {
+      "id": "clf_011",
+      "incident_description": "A fake seller cheated me after taking payment for goods he never delivered.",
+      "expected_title": "Cheating",
+      "predicted_title": "Cheating",
+      "predicted_section": "BNS - Cheating",
+      "confidence": 0.65,
+      "reasoning": "The complaint suggests deception or dishonest inducement leading to wrongful loss.",
+      "correct": true,
+      "latency_ms": 19.99
+    },
+    {
+      "id": "clf_012",
+      "incident_description": "Two men assaulted me outside my office and caused injuries.",
+      "expected_title": "Voluntarily Causing Hurt / Assault",
+      "predicted_title": "Voluntarily Causing Hurt / Assault",
+      "predicted_section": "BNS - Hurt / Assault",
+      "confidence": 0.65,
+      "reasoning": "The complaint includes physical violence or bodily injury.",
+      "correct": true,
+      "latency_ms": 21.67
+    },
+    {
+      "id": "clf_013",
+      "incident_description": "A stranger kept following me and sending obscene messages.",
+      "expected_title": "Sexual Harassment / Stalking",
+      "predicted_title": "Sexual Harassment / Stalking",
+      "predicted_section": "BNS - Sexual Harassment / Stalking",
+      "confidence": 0.65,
+      "reasoning": "The complaint indicates unwelcome sexual conduct, harassment, or repeated following/contact.",
+      "correct": true,
+      "latency_ms": 19.04
+    },
+    {
+      "id": "clf_014",
+      "incident_description": "My former tenant unlawfully entered the premises and damaged the lock.",
+      "expected_title": "Criminal Trespass",
+      "predicted_title": "Criminal Trespass",
+      "predicted_section": "BNS - Criminal Trespass",
+      "confidence": 0.75,
+      "reasoning": "The complaint suggests unlawful entry into property or premises. The complaint involves damage or destruction of property.",
+      "correct": true,
+      "latency_ms": 41.04
+    },
+    {
+      "id": "clf_015",
+      "incident_description": "Someone broke the windows of my shop and damaged the counter.",
+      "expected_title": "Mischief / Property Damage",
+      "predicted_title": "Mischief / Property Damage",
+      "predicted_section": "BNS - Mischief / Property Damage",
+      "confidence": 0.75,
+      "reasoning": "The complaint involves damage or destruction of property.",
+      "correct": true,
+      "latency_ms": 20.67
+    },
+    {
+      "id": "clf_016",
+      "incident_description": "My purse was snatched at the bus stop.",
+      "expected_title": "Theft",
+      "predicted_title": "Theft",
+      "predicted_section": "BNS - Theft",
+      "confidence": 0.65,
+      "reasoning": "The complaint describes unauthorized taking of movable property from the complainant.",
+      "correct": true,
+      "latency_ms": 19.8
+    },
+    {
+      "id": "clf_017",
+      "incident_description": "He threatened to burn my house if I went to the police.",
+      "expected_title": "Criminal Intimidation",
+      "predicted_title": "Criminal Intimidation",
+      "predicted_section": "BNS - Criminal Intimidation",
+      "confidence": 0.75,
+      "reasoning": "The complaint describes threats intended to cause alarm or coerce the complainant. The complaint suggests unlawful entry into property or premises.",
+      "correct": true,
+      "latency_ms": 42.31
+    },
+    {
+      "id": "clf_018",
+      "incident_description": "The website tricked me into sharing OTP and took my money.",
+      "expected_title": "Cheating",
+      "predicted_title": "Cheating",
+      "predicted_section": "BNS - Cheating",
+      "confidence": 0.65,
+      "reasoning": "The complaint suggests deception or dishonest inducement leading to wrongful loss.",
+      "correct": true,
+      "latency_ms": 21.99
+    },
+    {
+      "id": "clf_019",
+      "incident_description": "Three persons attacked me with fists and caused bleeding.",
+      "expected_title": "Voluntarily Causing Hurt / Assault",
+      "predicted_title": "Voluntarily Causing Hurt / Assault",
+      "predicted_section": "BNS - Hurt / Assault",
+      "confidence": 0.65,
+      "reasoning": "The complaint includes physical violence or bodily injury.",
+      "correct": true,
+      "latency_ms": 18.9
+    },
+    {
+      "id": "clf_020",
+      "incident_description": "My ex-boyfriend kept threatening me and stalking me near my office.",
+      "expected_title": "Sexual Harassment / Stalking",
+      "predicted_title": "Criminal Intimidation",
+      "predicted_section": "BNS - Criminal Intimidation",
+      "confidence": 0.65,
+      "reasoning": "The complaint describes threats intended to cause alarm or coerce the complainant. The complaint indicates unwelcome sexual conduct, harassment, or repeated following/contact.",
+      "correct": false,
+      "latency_ms": 46.07
+    }
+  ]
+}
