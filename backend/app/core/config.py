@@ -1,6 +1,7 @@
 from functools import lru_cache
 from pathlib import Path
 import secrets
+from urllib.parse import urlparse
 
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -21,6 +22,25 @@ def resolve_storage_path(path: Path, storage_root: Path | None) -> Path:
     return ROOT_DIR / path
 
 
+def normalize_turso_database_url(raw_url: str) -> str:
+    candidate = raw_url.strip()
+    if not candidate:
+        return candidate
+    if candidate.startswith("sqlite+libsql://"):
+        return candidate
+    if candidate.startswith("libsql://"):
+        return f"sqlite+{candidate}"
+
+    parsed = urlparse(candidate)
+    if parsed.scheme in {"https", "http"} and parsed.netloc:
+        return f"sqlite+libsql://{parsed.netloc}"
+
+    if "://" not in candidate:
+        return f"sqlite+libsql://{candidate.rstrip('/')}"
+
+    return candidate
+
+
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=ROOT_DIR / ".env", env_file_encoding="utf-8", extra="ignore")
 
@@ -36,6 +56,8 @@ class Settings(BaseSettings):
 
     app_sqlite_path: Path = Field(default=Path("storage/db/nyayasetu.sqlite3"), alias="APP_SQLITE_PATH")
     database_url: str | None = Field(default=None, alias="DATABASE_URL")
+    turso_database_url: str | None = Field(default=None, alias="TURSO_DATABASE_URL")
+    turso_auth_token: str | None = Field(default=None, alias="TURSO_AUTH_TOKEN")
     analytics_db_path: Path = Field(default=Path("data/analytics/legal_corpus.duckdb"), alias="ANALYTICS_DB_PATH")
 
     embedding_model_name: str = Field(
@@ -82,8 +104,18 @@ class Settings(BaseSettings):
     @property
     def resolved_database_url(self) -> str:
         if self.database_url:
-            return self.database_url
+            return normalize_turso_database_url(self.database_url)
+        if self.turso_database_url:
+            return normalize_turso_database_url(self.turso_database_url)
         return f"sqlite+pysqlite:///{self.app_sqlite_path.resolve().as_posix()}"
+
+    @property
+    def resolved_database_connect_args(self) -> dict:
+        if self.resolved_database_url.startswith("sqlite+libsql://"):
+            return {"auth_token": self.turso_auth_token} if self.turso_auth_token else {}
+        if self.resolved_database_url.startswith("sqlite"):
+            return {"check_same_thread": False}
+        return {}
 
 
 @lru_cache

@@ -10,7 +10,7 @@ pinned: false
 
 # NyayaSetu
 
-NyayaSetu is a self-hosted legal intelligence platform for Indian law. The stack uses open-source models, FAISS retrieval, SQLite for application state, DuckDB for corpus analytics, and manifest-driven ingestion from official legal sources.
+NyayaSetu is a self-hosted legal intelligence platform for Indian law. The stack uses open-source models, FAISS retrieval, SQLite or Turso/libSQL for application state, DuckDB for corpus analytics, and manifest-driven ingestion from official legal sources.
 
 ## Architecture
 
@@ -32,7 +32,7 @@ flowchart TD
 
 ## Storage Layer
 
-- `SQLite`: app audit logs and lightweight metadata.
+- `SQLite / Turso (libSQL)`: app audit logs, user auth, FIR ownership, and lightweight metadata.
 - `DuckDB`: corpus documents, chunk analytics, target tracking, and section mappings.
 - `FAISS`: vector similarity index.
 - `JSONL`: ingestion manifests and processed corpus exports.
@@ -76,6 +76,8 @@ Suggested Space settings:
 - Secrets:
   - `AUTH_SECRET_KEY`: required if you want login tokens to remain valid across Space restarts
   - `FRONTEND_URL`: your deployed frontend domain
+  - `TURSO_DATABASE_URL`: optional external app database such as `libsql://your-db-name-your-org.turso.io`
+  - `TURSO_AUTH_TOKEN`: required when `TURSO_DATABASE_URL` points at a protected Turso database
 
 Persistent storage note:
 
@@ -86,6 +88,37 @@ Persistent storage note:
   - DuckDB analytics DB
   - FAISS index and metadata
   - uploaded files
+
+## External Database Option: Turso
+
+NyayaSetu can use Turso as the hosted application database while keeping DuckDB and FAISS local to the deployment.
+
+Set these environment variables:
+
+```bash
+TURSO_DATABASE_URL=libsql://your-db-name-your-org.turso.io
+TURSO_AUTH_TOKEN=your-turso-auth-token
+```
+
+The backend normalizes Turso URLs into the official SQLAlchemy libSQL dialect and uses the Turso auth token through `connect_args`.
+
+Behavior:
+
+- If `DATABASE_URL` is set, it takes precedence.
+- Otherwise, if `TURSO_DATABASE_URL` is set, the app uses Turso.
+- Otherwise, the app falls back to local SQLite.
+
+This means you can keep the same codebase for:
+
+- local development on SQLite
+- Hugging Face Space deployment with persistent local storage
+- Hugging Face Space deployment with an external Turso app database
+
+To migrate your existing local SQLite app records into Turso after setting the Turso env vars:
+
+```bash
+python backend/scripts/migrate_sqlite_to_app_db.py --source-sqlite storage/db/db.db --truncate-target
+```
 
 Push flow:
 

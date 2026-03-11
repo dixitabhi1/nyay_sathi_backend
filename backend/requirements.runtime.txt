@@ -3,6 +3,7 @@ uvicorn[standard]==0.35.0
 pydantic==2.11.3
 pydantic-settings==2.10.1
 sqlalchemy==2.0.40
+sqlalchemy-libsql==0.2.0
 httpx==0.28.1
 numpy==2.2.4
 faiss-cpu==1.10.0

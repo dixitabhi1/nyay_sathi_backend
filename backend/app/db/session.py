@@ -12,8 +12,10 @@ class Base(DeclarativeBase):
 
 settings = get_settings()
 engine_kwargs: dict = {"future": True}
-if settings.resolved_database_url.startswith("sqlite"):
-    engine_kwargs["connect_args"] = {"check_same_thread": False}
+if settings.resolved_database_connect_args:
+    engine_kwargs["connect_args"] = settings.resolved_database_connect_args
+if settings.resolved_database_url.startswith("sqlite+libsql://"):
+    engine_kwargs["pool_pre_ping"] = True
 engine = create_engine(settings.resolved_database_url, **engine_kwargs)
 SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False, future=True)
 
