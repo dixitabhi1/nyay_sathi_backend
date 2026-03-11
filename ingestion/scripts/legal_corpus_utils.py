@@ -9,7 +9,9 @@ from bs4 import BeautifulSoup
 from pypdf import PdfReader
 
 
-SECTION_REGEX = re.compile(r"(?im)^(section\s+\d+[a-zA-Z-]*\.?.*|chapter\s+[ivxlcdm]+.*)$")
+SECTION_REGEX = re.compile(r"(?im)^(section\s+\d+[a-zA-Z-]*\.?.*|chapter\s+[ivxlcdm]+.*|\d+\.\s+.+)$")
+SECTION_NUMBER_REGEX = re.compile(r"(?i)(?:section\s+)?(\d+[A-Za-z-]*)")
+SUBSECTION_SPLIT_REGEX = re.compile(r"(?=(?:^|\n)\((\d+[A-Za-z]?)\)\s+)")
 CITATION_PATTERNS = [
     re.compile(r"\b(?:Section|Sections)\s+\d+[A-Za-z-]*(?:\s*(?:to|-)\s*\d+[A-Za-z-]*)?", re.IGNORECASE),
     re.compile(r"\b\d{4}\s+INSC\s+\d+\b", re.IGNORECASE),
@@ -109,33 +111,67 @@ def split_statute_sections(text: str) -> list[tuple[str, str]]:
     return [(heading, "\n".join(block_lines).strip()) for heading, block_lines in blocks if block_lines]
 
 
+def extract_section_number(heading: str) -> str | None:
+    match = SECTION_NUMBER_REGEX.search(heading)
+    if not match:
+        return None
+    return match.group(1)
+
+
+def split_statute_subsections(section_text: str) -> list[tuple[str, str]]:
+    matches = list(SUBSECTION_SPLIT_REGEX.finditer(section_text))
+    if len(matches) <= 1:
+        return []
+
+    subsections: list[tuple[str, str]] = []
+    for index, match in enumerate(matches):
+        label = match.group(1)
+        start = match.start()
+        end = matches[index + 1].start() if index + 1 < len(matches) else len(section_text)
+        body = section_text[start:end].strip()
+        if body:
+            subsections.append((label, body))
+    return subsections
+
+
 def build_statute_chunks(document: dict) -> list[dict]:
     sections = split_statute_sections(document["text"])
     chunks: list[dict] = []
     if not sections:
         sections = [(document["citation"] or document["title"], document["text"])]
     for section_index, (heading, section_text) in enumerate(sections, start=1):
-        for local_index, chunk in enumerate(chunk_text(section_text, chunk_chars=1200, overlap=160), start=1):
+        section_number = extract_section_number(heading)
+        subsection_blocks = split_statute_subsections(section_text)
+        if subsection_blocks and section_number:
+            granular_units = [
+                (f"Section {section_number}({subsection_label})", subsection_text, "statute_subsection")
+                for subsection_label, subsection_text in subsection_blocks
+            ]
+        else:
             citation_suffix = heading if heading.lower().startswith("section") else f"Section Block {section_index}"
-            chunk_id = stable_id(document["document_id"], citation_suffix, str(local_index))
-            chunk_summary = summarize_text(chunk, "statute")
-            chunks.append(
-                {
-                    "chunk_id": chunk_id,
-                    "document_id": document["document_id"],
-                    "title": document["title"],
-                    "citation": f"{document['citation']} | {citation_suffix}" if document.get("citation") else citation_suffix,
-                    "source_type": document["source_type"],
-                    "document_type": document["document_type"],
-                    "language": document["language"],
-                    "source_url": document["source_url"],
-                    "text": chunk,
-                    "summary": chunk_summary,
-                    "linked_citations": extract_citations(chunk),
-                    "chunk_strategy": "statute_section",
-                    "chunk_size": len(chunk),
-                }
-            )
+            granular_units = [(citation_suffix, section_text, "statute_section")]
+
+        for granular_heading, granular_text, strategy in granular_units:
+            for local_index, chunk in enumerate(chunk_text(granular_text, chunk_chars=1200, overlap=160), start=1):
+                chunk_id = stable_id(document["document_id"], granular_heading, str(local_index))
+                chunk_summary = summarize_text(chunk, "statute")
+                chunks.append(
+                    {
+                        "chunk_id": chunk_id,
+                        "document_id": document["document_id"],
+                        "title": document["title"],
+                        "citation": f"{document['citation']} | {granular_heading}" if document.get("citation") else granular_heading,
+                        "source_type": document["source_type"],
+                        "document_type": document["document_type"],
+                        "language": document["language"],
+                        "source_url": document["source_url"],
+                        "text": chunk,
+                        "summary": chunk_summary,
+                        "linked_citations": extract_citations(chunk),
+                        "chunk_strategy": strategy,
+                        "chunk_size": len(chunk),
+                    }
+                )
     return chunks
 
 

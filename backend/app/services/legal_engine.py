@@ -320,8 +320,12 @@ class LegalEngine:
 
     def _default_source_url(self, citation: str, title: str) -> str | None:
         haystack = f"{citation} {title}".lower()
+        if "bnss" in haystack or "bharatiya nagarik suraksha sanhita" in haystack:
+            return "https://www.indiacode.nic.in/handle/123456789/21544"
         if "bns" in haystack or "bharatiya nyaya sanhita" in haystack:
             return "https://www.indiacode.nic.in/handle/123456789/20062"
+        if "bsa" in haystack or "bharatiya sakshya adhiniyam" in haystack:
+            return "https://www.indiacode.nic.in/handle/123456789/20063"
         if "evidence act" in haystack or "65b" in haystack:
             return "https://www.indiacode.nic.in/handle/123456789/2187"
         if "contract act" in haystack:

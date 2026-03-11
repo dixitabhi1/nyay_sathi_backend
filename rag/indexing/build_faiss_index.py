@@ -16,10 +16,14 @@ def load_jsonl(path: Path) -> list[dict]:
 
 def build_embedding_text(row: dict) -> str:
     parts = [
+        row.get("source_id", ""),
+        row.get("document_type", ""),
+        row.get("chunk_strategy", ""),
         row.get("title", ""),
         row.get("citation", ""),
         row.get("summary", ""),
         row.get("text", ""),
+        " ".join(row.get("linked_citations", [])) if isinstance(row.get("linked_citations"), list) else "",
         row.get("question", ""),
         row.get("context", ""),
         row.get("answer", ""),

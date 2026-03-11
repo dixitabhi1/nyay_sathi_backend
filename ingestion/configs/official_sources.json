@@ -1,21 +1,36 @@
 [
   {
-    "source_id": "bns_bnss_bsa_acts_2023",
-    "title": "BNS, BNSS, and BSA official act downloads",
+    "source_id": "bns_2023",
+    "title": "Bharatiya Nyaya Sanhita, 2023",
     "source_type": "statute",
     "document_type": "act",
     "jurisdiction": "India",
     "language": "en",
-    "fetcher": "html_pdf_links",
-    "index_url": "https://www.legislative.gov.in/kannada/",
-    "allowed_domains": ["legislative.gov.in"],
-    "link_regex": [".*\\.pdf$"],
-    "keywords": [
-      "Bharatiya Nyaya Sanhita",
-      "Bharatiya Nagarik Suraksha Sanhita",
-      "Bharatiya Sakshya"
-    ],
-    "limit": 10
+    "fetcher": "direct_url",
+    "url": "https://www.indiacode.nic.in/bitstream/123456789/20062/1/a202345.pdf",
+    "citation": "Act No. 45 of 2023"
+  },
+  {
+    "source_id": "bnss_2023",
+    "title": "Bharatiya Nagarik Suraksha Sanhita, 2023",
+    "source_type": "statute",
+    "document_type": "act",
+    "jurisdiction": "India",
+    "language": "en",
+    "fetcher": "direct_url",
+    "url": "https://www.indiacode.nic.in/bitstream/123456789/21544/1/the_bharatiya_nagarik_suraksha_sanhita%2C_2023.pdf",
+    "citation": "Act No. 46 of 2023"
+  },
+  {
+    "source_id": "bsa_2023",
+    "title": "Bharatiya Sakshya Adhiniyam, 2023",
+    "source_type": "statute",
+    "document_type": "act",
+    "jurisdiction": "India",
+    "language": "en",
+    "fetcher": "direct_url",
+    "url": "https://www.indiacode.nic.in/bitstream/123456789/20063/1/aa202347.pdf",
+    "citation": "Act No. 47 of 2023"
   },
   {
     "source_id": "ipc_1860",
@@ -108,4 +123,3 @@
     "limit": 30
   }
 ]
-

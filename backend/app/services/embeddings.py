@@ -21,10 +21,14 @@ NON_LEGAL_SCOPE_ANCHORS = [
 
 def build_embedding_text(record: dict) -> str:
     parts = [
+        record.get("source_id", ""),
+        record.get("document_type", ""),
+        record.get("chunk_strategy", ""),
         record.get("title", ""),
         record.get("citation", ""),
         record.get("summary", ""),
         record.get("text", ""),
+        " ".join(record.get("linked_citations", [])) if isinstance(record.get("linked_citations"), list) else "",
         record.get("question", ""),
         record.get("context", ""),
         record.get("answer", ""),
