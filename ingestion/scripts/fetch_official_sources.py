@@ -12,7 +12,10 @@ import httpx
 from bs4 import BeautifulSoup
 
 
-USER_AGENT = "NyayaSetuBot/0.1 (+self-hosted legal corpus ingestion)"
+USER_AGENT = (
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+    "(KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
+)
 
 
 def load_sources(path: Path) -> list[dict]:
@@ -116,10 +119,26 @@ def main() -> None:
 
     sources = load_sources(Path(args.manifest))
     records: list[dict] = []
-    headers = {"User-Agent": USER_AGENT}
+    headers = {
+        "User-Agent": USER_AGENT,
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+        "Accept-Language": "en-US,en;q=0.9",
+        "Referer": "https://www.indiacode.nic.in/",
+    }
     with httpx.Client(headers=headers, timeout=90.0) as client:
         for source in sources:
-            assets = discover_assets(source, client)
+            try:
+                assets = discover_assets(source, client)
+            except Exception as exc:
+                records.append(
+                    {
+                        "source_id": source["source_id"],
+                        "status": "error",
+                        "error": f"asset discovery failed: {exc}",
+                        "downloaded_at": datetime.now(timezone.utc).isoformat(),
+                    }
+                )
+                continue
             source_limit = args.limit_per_source or int(source.get("limit", 0) or 0)
             selected_assets = assets[:source_limit] if source_limit else assets
             for asset in selected_assets:

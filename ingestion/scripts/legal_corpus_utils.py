@@ -153,7 +153,7 @@ def build_statute_chunks(document: dict) -> list[dict]:
 
         for granular_heading, granular_text, strategy in granular_units:
             for local_index, chunk in enumerate(chunk_text(granular_text, chunk_chars=1200, overlap=160), start=1):
-                chunk_id = stable_id(document["document_id"], granular_heading, str(local_index))
+                chunk_id = stable_id(document["document_id"], str(section_index), granular_heading, strategy, str(local_index))
                 chunk_summary = summarize_text(chunk, "statute")
                 chunks.append(
                     {

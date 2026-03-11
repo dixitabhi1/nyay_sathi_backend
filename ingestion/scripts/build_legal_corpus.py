@@ -122,6 +122,16 @@ def main() -> None:
         else:
             chunks.extend(build_judgment_chunks(document))
 
+    deduped_chunks: list[dict] = []
+    seen_chunk_ids: set[str] = set()
+    for chunk in chunks:
+        chunk_id = chunk["chunk_id"]
+        if chunk_id in seen_chunk_ids:
+            continue
+        seen_chunk_ids.add(chunk_id)
+        deduped_chunks.append(chunk)
+    chunks = deduped_chunks
+
     dumps_jsonl(chunks, Path(args.output_corpus))
 
     connection = duckdb.connect(args.analytics_db)
