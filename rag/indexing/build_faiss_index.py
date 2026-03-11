@@ -11,9 +11,13 @@ import faiss
 import numpy as np
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
+BACKEND_ROOT = PROJECT_ROOT / "backend"
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
+if str(BACKEND_ROOT) not in sys.path:
+    sys.path.insert(0, str(BACKEND_ROOT))
 
+from app.core.config import get_settings
 from ingestion.scripts.legal_corpus_utils import stable_id
 
 
@@ -32,16 +36,6 @@ def build_embedding_text(record: dict) -> str:
         record.get("answer", ""),
     ]
     return "\n".join(part.strip() for part in parts if isinstance(part, str) and part.strip())
-
-
-def resolve_default_model_name() -> str:
-    env_path = PROJECT_ROOT / ".env"
-    if env_path.exists():
-        for line in env_path.read_text(encoding="utf-8").splitlines():
-            if line.startswith("EMBEDDING_MODEL_NAME="):
-                return line.split("=", 1)[1].strip() or "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
-    return "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
-
 
 def load_corpus(path: Path) -> list[dict]:
     return [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
@@ -82,14 +76,17 @@ def update_vector_positions(analytics_db: Path, metadata: list[dict]) -> None:
 
 
 def main() -> None:
+    settings = get_settings()
+    default_checkpoint_dir = settings.vector_index_path.parent / "checkpoints" / "legal"
+
     parser = argparse.ArgumentParser(description="Build a FAISS index from the NyayaSetu legal corpus.")
-    parser.add_argument("--corpus-path", default="data/corpus/official_legal_corpus.jsonl")
-    parser.add_argument("--index-path", default="data/index/legal.index")
-    parser.add_argument("--metadata-path", default="data/index/legal_metadata.json")
-    parser.add_argument("--analytics-db", default="data/analytics/legal_corpus.duckdb")
-    parser.add_argument("--model-name", default=resolve_default_model_name())
+    parser.add_argument("--corpus-path", default=str(settings.legal_corpus_path))
+    parser.add_argument("--index-path", default=str(settings.vector_index_path))
+    parser.add_argument("--metadata-path", default=str(settings.vector_metadata_path))
+    parser.add_argument("--analytics-db", default=str(settings.analytics_db_path))
+    parser.add_argument("--model-name", default=settings.embedding_model_name)
     parser.add_argument("--batch-size", type=int, default=128)
-    parser.add_argument("--checkpoint-dir", default="data/index/checkpoints/legal")
+    parser.add_argument("--checkpoint-dir", default=str(default_checkpoint_dir))
     parser.add_argument("--reset", action="store_true")
     args = parser.parse_args()
 

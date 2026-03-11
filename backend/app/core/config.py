@@ -13,6 +13,14 @@ def resolve_repo_path(path: Path) -> Path:
     return path if path.is_absolute() else ROOT_DIR / path
 
 
+def resolve_storage_path(path: Path, storage_root: Path | None) -> Path:
+    if path.is_absolute():
+        return path
+    if storage_root is not None:
+        return storage_root / path
+    return ROOT_DIR / path
+
+
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=ROOT_DIR / ".env", env_file_encoding="utf-8", extra="ignore")
 
@@ -24,17 +32,18 @@ class Settings(BaseSettings):
     frontend_url: str = Field(default="http://localhost:5173", alias="FRONTEND_URL")
     auth_secret_key: str = Field(default_factory=lambda: secrets.token_urlsafe(48), alias="AUTH_SECRET_KEY")
     auth_token_ttl_hours: int = Field(default=24, alias="AUTH_TOKEN_TTL_HOURS")
+    persistent_storage_root: Path | None = Field(default=None, alias="PERSISTENT_STORAGE_ROOT")
 
-    app_sqlite_path: Path = Field(default=ROOT_DIR / "storage" / "db" / "nyayasetu.sqlite3", alias="APP_SQLITE_PATH")
+    app_sqlite_path: Path = Field(default=Path("storage/db/nyayasetu.sqlite3"), alias="APP_SQLITE_PATH")
     database_url: str | None = Field(default=None, alias="DATABASE_URL")
-    analytics_db_path: Path = Field(default=ROOT_DIR / "data" / "analytics" / "legal_corpus.duckdb", alias="ANALYTICS_DB_PATH")
+    analytics_db_path: Path = Field(default=Path("data/analytics/legal_corpus.duckdb"), alias="ANALYTICS_DB_PATH")
 
     embedding_model_name: str = Field(
         default="sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2",
         alias="EMBEDDING_MODEL_NAME",
     )
-    vector_index_path: Path = Field(default=ROOT_DIR / "data" / "index" / "legal.index", alias="VECTOR_INDEX_PATH")
-    vector_metadata_path: Path = Field(default=ROOT_DIR / "data" / "index" / "legal_metadata.json", alias="VECTOR_METADATA_PATH")
+    vector_index_path: Path = Field(default=Path("data/index/legal.index"), alias="VECTOR_INDEX_PATH")
+    vector_metadata_path: Path = Field(default=Path("data/index/legal_metadata.json"), alias="VECTOR_METADATA_PATH")
     legal_corpus_path: Path = Field(
         default=ROOT_DIR / "data" / "corpus" / "official_legal_corpus.jsonl",
         alias="LEGAL_CORPUS_PATH",
@@ -66,7 +75,7 @@ class Settings(BaseSettings):
     max_generation_tokens: int = Field(default=768, alias="MAX_GENERATION_TOKENS")
     temperature: float = Field(default=0.2, alias="TEMPERATURE")
 
-    upload_dir: Path = Field(default=ROOT_DIR / "storage" / "uploads", alias="UPLOAD_DIR")
+    upload_dir: Path = Field(default=Path("storage/uploads"), alias="UPLOAD_DIR")
     ocr_language: str = Field(default="eng+hin", alias="OCR_LANGUAGE")
     whisper_model: str = Field(default="tiny", alias="WHISPER_MODEL")
 
@@ -80,18 +89,26 @@ class Settings(BaseSettings):
 @lru_cache
 def get_settings() -> Settings:
     settings = Settings()
-    settings.app_sqlite_path = resolve_repo_path(settings.app_sqlite_path)
-    settings.analytics_db_path = resolve_repo_path(settings.analytics_db_path)
-    settings.vector_index_path = resolve_repo_path(settings.vector_index_path)
-    settings.vector_metadata_path = resolve_repo_path(settings.vector_metadata_path)
+    settings.persistent_storage_root = (
+        settings.persistent_storage_root if settings.persistent_storage_root and settings.persistent_storage_root.is_absolute()
+        else resolve_repo_path(settings.persistent_storage_root) if settings.persistent_storage_root
+        else None
+    )
+    settings.app_sqlite_path = resolve_storage_path(settings.app_sqlite_path, settings.persistent_storage_root)
+    settings.analytics_db_path = resolve_storage_path(settings.analytics_db_path, settings.persistent_storage_root)
+    settings.vector_index_path = resolve_storage_path(settings.vector_index_path, settings.persistent_storage_root)
+    settings.vector_metadata_path = resolve_storage_path(settings.vector_metadata_path, settings.persistent_storage_root)
     settings.legal_corpus_path = resolve_repo_path(settings.legal_corpus_path)
     settings.bootstrap_corpus_path = resolve_repo_path(settings.bootstrap_corpus_path)
     settings.official_sources_manifest_path = resolve_repo_path(settings.official_sources_manifest_path)
     settings.jurisdiction_gazetteer_path = resolve_repo_path(settings.jurisdiction_gazetteer_path)
-    settings.upload_dir = resolve_repo_path(settings.upload_dir)
+    settings.upload_dir = resolve_storage_path(settings.upload_dir, settings.persistent_storage_root)
+    if settings.persistent_storage_root:
+        settings.persistent_storage_root.mkdir(parents=True, exist_ok=True)
     settings.app_sqlite_path.parent.mkdir(parents=True, exist_ok=True)
     settings.analytics_db_path.parent.mkdir(parents=True, exist_ok=True)
     settings.vector_index_path.parent.mkdir(parents=True, exist_ok=True)
+    settings.vector_metadata_path.parent.mkdir(parents=True, exist_ok=True)
     settings.legal_corpus_path.parent.mkdir(parents=True, exist_ok=True)
     settings.upload_dir.mkdir(parents=True, exist_ok=True)
     return settings

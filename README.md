@@ -65,12 +65,27 @@ Deployment shape:
 - Default Space port is `7860`.
 - Current Docker image uses `backend/requirements.no-whisper.txt` to avoid blocking the Space build on Whisper packaging.
 - Set `FRONTEND_URL` in the Space settings to your deployed Loveable frontend URL so browser requests are allowed by CORS.
+- Mutable runtime data is routed through `PERSISTENT_STORAGE_ROOT`, which defaults to `/data/nyayasetu` inside the Docker Space.
+- The Docker startup script seeds the FAISS index into the persistent root and rebuilds it there only if the persisted copy is missing.
 
 Suggested Space settings:
 
 - SDK: `Docker`
 - Hardware: `CPU Basic` for API and FAISS demos, `GPU` only if you attach heavier local inference
 - Visibility: `Private` for personal use
+- Secrets:
+  - `AUTH_SECRET_KEY`: required if you want login tokens to remain valid across Space restarts
+  - `FRONTEND_URL`: your deployed frontend domain
+
+Persistent storage note:
+
+- Free default Space storage is ephemeral across rebuilds.
+- If you want user accounts, FIR history, uploads, and the FAISS index to survive rebuilds, enable Hugging Face persistent storage for the Space.
+- Once persistent storage is enabled, the app will use `/data/nyayasetu` automatically for:
+  - SQLite app DB
+  - DuckDB analytics DB
+  - FAISS index and metadata
+  - uploaded files
 
 Push flow:
 

@@ -6,6 +6,14 @@ ENV API_HOST=0.0.0.0
 ENV API_PORT=7860
 ENV FRONTEND_URL=https://example.lovable.app
 ENV EMBEDDING_MODEL_NAME=sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2
+ENV PERSISTENT_STORAGE_ROOT=/data/nyayasetu
+ENV APP_SQLITE_PATH=db/db.db
+ENV ANALYTICS_DB_PATH=analytics/legal_corpus.duckdb
+ENV VECTOR_INDEX_PATH=index/legal.index
+ENV VECTOR_METADATA_PATH=index/legal_metadata.json
+ENV UPLOAD_DIR=uploads
+ENV HF_HOME=/data/.huggingface
+ENV TRANSFORMERS_CACHE=/data/.huggingface
 
 WORKDIR /app
 
@@ -26,11 +34,19 @@ COPY ingestion /app/ingestion
 COPY rag /app/rag
 COPY data /app/data
 COPY storage /app/storage
+COPY docker/start-space.sh /app/docker/start-space.sh
 COPY .env.example /app/.env.example
 
-RUN python /app/rag/indexing/build_faiss_index.py --checkpoint-dir /app/data/index/checkpoints/legal_space_build
+RUN chmod +x /app/docker/start-space.sh \
+    && PERSISTENT_STORAGE_ROOT= \
+       APP_SQLITE_PATH=/app/storage/db/nyayasetu.sqlite3 \
+       ANALYTICS_DB_PATH=/app/data/analytics/legal_corpus.duckdb \
+       VECTOR_INDEX_PATH=/app/data/index/legal.index \
+       VECTOR_METADATA_PATH=/app/data/index/legal_metadata.json \
+       UPLOAD_DIR=/app/storage/uploads \
+       python /app/rag/indexing/build_faiss_index.py --checkpoint-dir /app/data/index/checkpoints/legal_space_build
 
 WORKDIR /app/backend
 ENV PYTHONPATH=/app/backend:/app
 
-CMD ["sh", "-c", "if [ ! -f /app/data/index/legal.index ]; then python /app/rag/indexing/build_faiss_index.py --checkpoint-dir /app/data/index/checkpoints/legal_space_runtime; fi && uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-7860}"]
+CMD ["/app/docker/start-space.sh"]
