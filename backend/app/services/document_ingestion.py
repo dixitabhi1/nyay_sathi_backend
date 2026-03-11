@@ -22,6 +22,7 @@ class DocumentIngestionService:
 
     async def extract_text(self, upload: UploadFile) -> str:
         suffix = Path(upload.filename or "").suffix.lower()
+        content_type = (upload.content_type or "").lower()
         content = await upload.read()
         await upload.seek(0)
 
@@ -37,7 +38,7 @@ class DocumentIngestionService:
 
             document = Document(BytesIO(content))
             return "\n".join(paragraph.text for paragraph in document.paragraphs)
-        if suffix in {".png", ".jpg", ".jpeg"}:
+        if suffix in {".png", ".jpg", ".jpeg", ".webp", ".bmp", ".tif", ".tiff"} or content_type.startswith("image/"):
             from PIL import Image
             import pytesseract
 
