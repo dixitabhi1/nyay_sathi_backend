@@ -16,13 +16,52 @@ EXPLICIT_NON_LEGAL_PATTERNS = [
     re.compile(r"\bcricket\b", re.IGNORECASE),
     re.compile(r"\breact hooks?\b", re.IGNORECASE),
     re.compile(r"\bmy name\b", re.IGNORECASE),
+    re.compile(r"\bdata structures?\b", re.IGNORECASE),
+    re.compile(r"\balgorithms?\b", re.IGNORECASE),
+    re.compile(r"\bprogramming\b", re.IGNORECASE),
+    re.compile(r"\bcoding\b", re.IGNORECASE),
+    re.compile(r"\bpython\b", re.IGNORECASE),
+    re.compile(r"\bjava(script)?\b", re.IGNORECASE),
+    re.compile(r"\bc\+\+\b", re.IGNORECASE),
+    re.compile(r"\bdbms\b", re.IGNORECASE),
+    re.compile(r"\boperating system\b", re.IGNORECASE),
+    re.compile(r"\bmachine learning\b", re.IGNORECASE),
+    re.compile(r"\bdeep learning\b", re.IGNORECASE),
 ]
 
 LEGAL_INTENT_PATTERNS = [
     re.compile(r"\b(section|sections|act|law|legal|fir|complaint|bns|bnss|bsa|ipc)\b", re.IGNORECASE),
     re.compile(r"\b(arrest|bail|evidence|contract|notice|rights|judgment|court|police)\b", re.IGNORECASE),
     re.compile(r"\b(theft|cheating|fraud|threat|intimidation|assault|harassment|trespass)\b", re.IGNORECASE),
+    re.compile(r"\b(defamation|extortion|murder|kidnapping|dowry|stalking|cybercrime|cyber crime)\b", re.IGNORECASE),
+    re.compile(r"\b(tenant|landlord|property|consumer|copyright|trademark|divorce|maintenance|succession|will)\b", re.IGNORECASE),
 ]
+
+LEGAL_REFERENCE_PATTERNS = [
+    re.compile(r"\b(section|act|code|sanhita|adhiniyam|judgment|court|rights|procedure|fir)\b", re.IGNORECASE),
+    re.compile(r"\b(bns|bnss|bsa|ipc|crpc|contract act|evidence act|consumer protection)\b", re.IGNORECASE),
+]
+
+OFFICIAL_SOURCE_HOSTS = (
+    "indiacode.nic.in",
+    "legislative.gov.in",
+    "sci.gov.in",
+    "ecourts.gov.in",
+)
+
+SUBSTANTIVE_OFFENCE_KEYWORDS = (
+    "defamation",
+    "theft",
+    "cheating",
+    "fraud",
+    "extortion",
+    "murder",
+    "kidnapping",
+    "stalking",
+    "harassment",
+    "intimidation",
+    "trespass",
+)
 
 
 class Retriever:
@@ -67,12 +106,15 @@ class Retriever:
         if explicit_override is not None:
             return explicit_override
 
+        has_legal_intent = self._has_legal_intent(query)
         exact_hits = self.lookup_exact_reference(query, self.settings.top_k_retrieval)
         if exact_hits:
             top_corpus_score = exact_hits[0]["score"] if exact_hits else 0.0
             return {
                 "in_scope": True,
                 "hits": exact_hits,
+                "has_legal_intent": True,
+                "grounded_hit_count": len(exact_hits),
                 "legal_anchor_score": 1.0,
                 "non_legal_anchor_score": 0.0,
                 "anchor_margin": 1.0,
@@ -82,17 +124,23 @@ class Retriever:
         query_vector = self.embeddings.encode_query(query)
         raw_hits = self.search_by_vector(query_vector, max(self.settings.top_k_retrieval * 4, 12))
         hits = self._rerank_hits(query, raw_hits, self.settings.top_k_retrieval)
-        top_corpus_score = hits[0]["score"] if hits else 0.0
+        grounded_hits = self._filter_grounded_hits(hits)
+        top_corpus_score = grounded_hits[0]["score"] if grounded_hits else 0.0
         legal_anchor_score = self.embeddings.max_similarity(query_vector, self.embeddings.legal_scope_anchor_embeddings)
         non_legal_anchor_score = self.embeddings.max_similarity(query_vector, self.embeddings.non_legal_scope_anchor_embeddings)
         anchor_margin = legal_anchor_score - non_legal_anchor_score
-        in_scope = (
+        semantic_legal_match = (
             legal_anchor_score >= self.settings.legal_scope_anchor_threshold
             and anchor_margin >= self.settings.legal_scope_margin
-        ) or top_corpus_score >= self.settings.legal_scope_corpus_threshold
+        )
+        in_scope = has_legal_intent and bool(grounded_hits) and (
+            semantic_legal_match or top_corpus_score >= self.settings.legal_scope_corpus_threshold
+        )
         return {
             "in_scope": in_scope,
-            "hits": hits,
+            "hits": grounded_hits if in_scope else [],
+            "has_legal_intent": has_legal_intent,
+            "grounded_hit_count": len(grounded_hits),
             "legal_anchor_score": round(legal_anchor_score, 4),
             "non_legal_anchor_score": round(non_legal_anchor_score, 4),
             "anchor_margin": round(anchor_margin, 4),
@@ -104,13 +152,15 @@ class Retriever:
 
     def _explicit_scope_override(self, query: str) -> dict | None:
         normalized = query.strip().lower()
-        has_legal_intent = any(pattern.search(normalized) for pattern in LEGAL_INTENT_PATTERNS)
+        has_legal_intent = self._has_legal_intent(normalized)
         matched_non_legal = [pattern.pattern for pattern in EXPLICIT_NON_LEGAL_PATTERNS if pattern.search(normalized)]
 
         if matched_non_legal and not has_legal_intent:
             return {
                 "in_scope": False,
                 "hits": [],
+                "has_legal_intent": False,
+                "grounded_hit_count": 0,
                 "legal_anchor_score": 0.0,
                 "non_legal_anchor_score": 1.0,
                 "anchor_margin": -1.0,
@@ -119,6 +169,21 @@ class Retriever:
                 "matched_non_legal_patterns": matched_non_legal,
             }
         return None
+
+    def _has_legal_intent(self, query: str) -> bool:
+        return any(pattern.search(query) for pattern in LEGAL_INTENT_PATTERNS)
+
+    def _filter_grounded_hits(self, hits: list[dict]) -> list[dict]:
+        return [item for item in hits if self._is_grounded_legal_hit(item)]
+
+    def _is_grounded_legal_hit(self, item: dict) -> bool:
+        source_type = str(item.get("source_type", "")).lower()
+        source_url = str(item.get("source_url", "")).lower()
+        haystack = f"{item.get('source_id', '')} {item.get('title', '')} {item.get('citation', '')} {item.get('text', '')}".lower()
+        has_legal_reference = any(pattern.search(haystack) for pattern in LEGAL_REFERENCE_PATTERNS)
+        from_official_host = any(host in source_url for host in OFFICIAL_SOURCE_HOSTS)
+        from_legal_source_type = source_type in {"statute", "judgment", "case_law", "precedent"}
+        return from_official_host or (from_legal_source_type and has_legal_reference)
 
     def lookup_exact_reference(self, query: str, top_k: int) -> list[dict]:
         normalized = query.lower()
@@ -207,6 +272,12 @@ class Retriever:
         wants_bns = "bns" in normalized or "bharatiya nyaya sanhita" in normalized
         wants_bnss = "bnss" in normalized or "bharatiya nagarik suraksha sanhita" in normalized
         wants_ipc_compare = "ipc" in normalized or "compare" in normalized or "comparison" in normalized
+        wants_substantive_offence = (
+            any(keyword in normalized for keyword in SUBSTANTIVE_OFFENCE_KEYWORDS)
+            and "procedure" not in normalized
+            and "cognizable" not in normalized
+            and "bailable" not in normalized
+        )
 
         reranked: list[dict] = []
         for item in hits:
@@ -224,6 +295,15 @@ class Retriever:
                 adjusted -= 0.06
             if re.search(r"\|\s*section\s+\d+\(\d+[a-z]?\)", item.get("citation", ""), flags=re.IGNORECASE):
                 adjusted += 0.04
+            if wants_substantive_offence:
+                if "bns" in haystack or "bharatiya nyaya sanhita" in haystack:
+                    adjusted += 0.16
+                if "bnss" in haystack or "bharatiya nagarik suraksha sanhita" in haystack:
+                    adjusted -= 0.18
+                if "cognizable" in haystack and "bailable" in haystack:
+                    adjusted -= 0.12
+                if re.search(r"\|\s*section\s+531", item.get("citation", ""), flags=re.IGNORECASE):
+                    adjusted -= 0.25
 
             reranked_item = dict(item)
             reranked_item["score"] = round(adjusted, 6)

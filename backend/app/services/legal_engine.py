@@ -51,20 +51,10 @@ class LegalEngine:
 
         scope = self.retriever.assess_scope(payload.question)
         if not scope["in_scope"]:
-            return ChatResponse(
-                answer="This question appears to be outside NyayaSetu's legal assistance scope.",
-                reasoning=(
-                    "NyayaSetu compares the query embedding against the legal corpus and legal-domain anchor embeddings. "
-                    "This prompt did not land close enough to legal materials to justify a grounded answer."
-                ),
-                sources=[],
-                in_scope=False,
-                scope_warning=(
-                    "Ask a legal question about Indian statutes, BNS or IPC sections, FIRs, contracts, rights, judgments, or legal procedure. "
-                    f"Embedding scope scores: legal={scope['legal_anchor_score']}, non-legal={scope['non_legal_anchor_score']}, corpus={scope['top_corpus_score']}."
-                ),
-            )
-        prioritized_hits = self._prioritize_hits_for_question(payload.question, scope["hits"])
+            return self._out_of_scope_response(scope)
+        prioritized_hits = self._filter_grounded_hits(self._prioritize_hits_for_question(payload.question, scope["hits"]))
+        if not prioritized_hits:
+            return self._insufficient_grounding_response()
         sources = [
             SourceDocument(
                 title=item["title"],
@@ -76,6 +66,8 @@ class LegalEngine:
             )
             for item in prioritized_hits
         ]
+        if not self._has_grounded_sources(sources):
+            return self._insufficient_grounding_response()
         context = self._format_sources_for_prompt(sources)
         if self.settings.inference_provider.lower() == "mock":
             parsed = self._synthesize_chat_answer(payload.question, sources)
@@ -96,8 +88,11 @@ class LegalEngine:
                 prompt,
             )
             parsed = self._parse_generation(generated)
+        answer = parsed.get("answer") or self._fallback_answer(sources)
+        if not self._answer_is_grounded(answer, sources):
+            return self._insufficient_grounding_response()
         return ChatResponse(
-            answer=parsed.get("answer") or self._fallback_answer(sources),
+            answer=answer,
             reasoning=parsed.get("reasoning") or "The answer is grounded in the retrieved legal materials listed below.",
             sources=sources,
             in_scope=True,
@@ -316,6 +311,52 @@ class LegalEngine:
         return "\n\n".join(
             f"{source.title} ({source.citation})\n{source.excerpt}"
             for source in sources
+        )
+
+    def _filter_grounded_hits(self, hits: list[dict]) -> list[dict]:
+        return [
+            item for item in hits
+            if item.get("source_url") or self._default_source_url(item.get("citation", ""), item.get("title", ""))
+        ]
+
+    def _has_grounded_sources(self, sources: list[SourceDocument]) -> bool:
+        return any(source.source_url and source.citation for source in sources)
+
+    def _answer_is_grounded(self, answer: str, sources: list[SourceDocument]) -> bool:
+        if not sources:
+            return False
+        lead = sources[0]
+        answer_lower = answer.lower()
+        excerpt_lower = lead.excerpt.lower()
+        if lead.citation.lower() in answer_lower:
+            return True
+        return any(fragment in answer_lower for fragment in excerpt_lower.split(". ")[:2] if fragment.strip())
+
+    def _out_of_scope_response(self, scope: dict) -> ChatResponse:
+        has_legal_intent = scope.get("has_legal_intent", False)
+        warning = (
+            "Ask a legal question about Indian statutes, BNS or IPC sections, FIRs, contracts, rights, judgments, or legal procedure."
+            if not has_legal_intent
+            else "Rephrase the question with the exact legal issue, section, act, or procedure so NyayaSetu can retrieve grounded legal authority."
+        )
+        return ChatResponse(
+            answer="This question appears to be outside NyayaSetu's legal assistance scope.",
+            reasoning=(
+                "NyayaSetu only answers when the query shows legal intent and retrieves grounded legal materials from the indexed corpus."
+            ),
+            sources=[],
+            in_scope=False,
+            scope_warning=warning,
+        )
+
+    def _insufficient_grounding_response(self) -> ChatResponse:
+        return ChatResponse(
+            answer="I could not find enough grounded legal authority to answer that safely.",
+            reasoning=(
+                "NyayaSetu rejected this response because the retrieved material was too weak, ambiguous, or insufficiently official to support a safe legal answer."
+            ),
+            sources=[],
+            in_scope=True,
         )
 
     def _default_source_url(self, citation: str, title: str) -> str | None:
