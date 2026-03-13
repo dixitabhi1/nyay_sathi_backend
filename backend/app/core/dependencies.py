@@ -17,6 +17,7 @@ from app.services.embeddings import EmbeddingService
 from app.services.inference import InferenceGateway
 from app.services.jurisdiction import JurisdictionService
 from app.services.legal_section_classifier import LegalSectionClassifier
+from app.services.lawyers import LawyerNetworkService
 from app.services.legal_engine import LegalEngine
 from app.services.retriever import Retriever
 from app.services.vector_store import FaissVectorStore
@@ -122,6 +123,12 @@ def get_fir_service() -> FIRService:
         evidence_intelligence=get_evidence_intelligence_service(),
         crime_pattern_service=get_crime_pattern_service(),
     )
+
+
+@lru_cache
+def get_lawyer_network_service() -> LawyerNetworkService:
+    init_db()
+    return LawyerNetworkService(get_fir_service())
 
 
 @lru_cache

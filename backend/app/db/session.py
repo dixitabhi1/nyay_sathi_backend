@@ -32,5 +32,6 @@ def init_db() -> None:
     from app.models.audit import AuditLog
     from app.models.auth import AuthSession, User
     from app.models.fir import FIREvidence, FIRRecord, FIRVersion
+    from app.models.lawyer import LawyerPost, LawyerProfile, LawyerReview
 
     Base.metadata.create_all(bind=engine)
