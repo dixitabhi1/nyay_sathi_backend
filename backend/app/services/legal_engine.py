@@ -49,10 +49,11 @@ class LegalEngine:
         if structural_response:
             return structural_response
 
-        scope = self.retriever.assess_scope(payload.question)
+        contextual_question = self._build_contextual_question(payload)
+        scope = self.retriever.assess_scope(contextual_question)
         if not scope["in_scope"]:
             return self._out_of_scope_response(scope)
-        prioritized_hits = self._filter_grounded_hits(self._prioritize_hits_for_question(payload.question, scope["hits"]))
+        prioritized_hits = self._filter_grounded_hits(self._prioritize_hits_for_question(contextual_question, scope["hits"]))
         if not prioritized_hits:
             return self._insufficient_grounding_response()
         sources = [
@@ -70,17 +71,24 @@ class LegalEngine:
             return self._insufficient_grounding_response()
         context = self._format_sources_for_prompt(sources)
         if self.settings.inference_provider.lower() == "mock":
-            parsed = self._synthesize_chat_answer(payload.question, sources)
+            parsed = self._synthesize_chat_answer(payload.question, sources, payload.history)
         else:
+            history_context = self._format_history_for_prompt(payload.history)
             prompt = dedent(
                 f"""
+                Conversation context:
+                {history_context or '[No prior conversation context]'}
+
                 User question: {payload.question}
+                Retrieval query used: {contextual_question}
                 Preferred language: {payload.language}
 
                 Retrieved legal context:
                 {context}
 
-                Answer with a plain-language explanation and concise legal reasoning.
+                Answer only from the retrieved context.
+                Return strict JSON with keys "answer" and "reasoning".
+                The answer must be plain-language, human-readable, cite the most relevant sections or authorities, and give practical next steps when appropriate.
                 """
             ).strip()
             generated = self.inference.generate(
@@ -308,10 +316,20 @@ class LegalEngine:
         ]
 
     def _format_sources_for_prompt(self, sources: list[SourceDocument]) -> str:
-        return "\n\n".join(
-            f"{source.title} ({source.citation})\n{source.excerpt}"
-            for source in sources
-        )
+        formatted: list[str] = []
+        for index, source in enumerate(sources, start=1):
+            formatted.append(
+                "\n".join(
+                    [
+                        f"[Source {index}] {source.title}",
+                        f"Citation: {source.citation}",
+                        f"Type: {source.source_type}",
+                        f"Excerpt: {source.excerpt}",
+                        f"URL: {source.source_url or 'Unavailable'}",
+                    ]
+                )
+            )
+        return "\n\n".join(formatted)
 
     def _filter_grounded_hits(self, hits: list[dict]) -> list[dict]:
         return [
@@ -325,12 +343,14 @@ class LegalEngine:
     def _answer_is_grounded(self, answer: str, sources: list[SourceDocument]) -> bool:
         if not sources:
             return False
-        lead = sources[0]
         answer_lower = answer.lower()
-        excerpt_lower = lead.excerpt.lower()
-        if lead.citation.lower() in answer_lower:
+        if any(source.citation.lower() in answer_lower for source in sources[:3]):
             return True
-        return any(fragment in answer_lower for fragment in excerpt_lower.split(". ")[:2] if fragment.strip())
+        return any(
+            fragment in answer_lower
+            for source in sources[:3]
+            for fragment in self._grounding_fragments(source)
+        )
 
     def _out_of_scope_response(self, scope: dict) -> ChatResponse:
         has_legal_intent = scope.get("has_legal_intent", False)
@@ -376,10 +396,15 @@ class LegalEngine:
         return None
 
     def _parse_generation(self, generated: str) -> dict:
+        candidate = generated.strip()
+        if "```" in candidate:
+            matches = re.findall(r"```(?:json)?\s*(\{.*?\})\s*```", candidate, flags=re.DOTALL)
+            if matches:
+                candidate = matches[0]
         try:
-            return json.loads(generated)
+            return json.loads(candidate)
         except json.JSONDecodeError:
-            return {"answer": generated.strip(), "reasoning": generated.strip()}
+            return {"answer": candidate.strip(), "reasoning": candidate.strip()}
 
     def _resolve_structural_statute_question(self, question: str) -> ChatResponse | None:
         normalized = question.lower().strip()
@@ -491,31 +516,126 @@ class LegalEngine:
                 prioritized = filtered
         return prioritized
 
-    def _synthesize_chat_answer(self, question: str, sources: list[SourceDocument]) -> dict:
+    def _synthesize_chat_answer(
+        self,
+        question: str,
+        sources: list[SourceDocument],
+        history: list | None = None,
+    ) -> dict:
         if not sources:
             return {
                 "answer": "I could not retrieve a matching legal passage for that question from the current corpus.",
                 "reasoning": "NyayaSetu is running without a generation model, so the reply must stay tied to retrieved legal material already indexed.",
             }
 
+        recent_context = self._history_context_snippet(history or [])
         lead = sources[0]
-        answer = (
-            f"Based on the retrieved legal material, the closest match is {lead.citation}. "
-            f"{lead.excerpt}"
-        )
-        if re.search(r"\bexplain\b|\bwhat is\b|\bmeaning\b", question.lower()):
-            answer = lead.excerpt
+        supporting = sources[1:3]
+        citations = ", ".join(dict.fromkeys(source.citation for source in sources[:3]))
+        explanation = self._plain_language_summary(lead)
+        support_lines = [
+            f"- {source.citation}: {self._plain_language_summary(source)}"
+            for source in supporting
+        ]
+        next_steps = self._suggest_question_specific_steps(question, sources)
+        answer_parts = [
+            f"Short answer: {explanation}",
+            f"Most relevant authority: {lead.citation}.",
+        ]
+        if recent_context:
+            answer_parts.append(f"Conversation context used: {recent_context}")
+        if support_lines:
+            answer_parts.append("Supporting material:\n" + "\n".join(support_lines))
+        if next_steps:
+            answer_parts.append("Practical next steps:\n" + "\n".join(f"- {step}" for step in next_steps))
+        answer_parts.append(f"Grounded citations: {citations}.")
         reasoning = (
-            "NyayaSetu is currently in retrieval-first mode, so this response is composed directly from the most relevant indexed legal source "
-            "instead of a separate generation model."
+            "NyayaSetu is in retrieval-first mode, so this answer was composed from the top grounded legal sources. "
+            f"It prioritized {citations} and converted the retrieved excerpts into plain-language guidance."
         )
-        return {"answer": answer, "reasoning": reasoning}
+        return {"answer": "\n\n".join(answer_parts), "reasoning": reasoning}
+
+    def _build_contextual_question(self, payload: ChatRequest) -> str:
+        question = payload.question.strip()
+        prior_user_turns = [message.content.strip() for message in payload.history if message.role == "user" and message.content.strip()]
+        if not prior_user_turns:
+            return question
+        if len(question.split()) <= 8 or re.search(r"\b(this|that|it|they|same|above|those|these|section)\b", question.lower()):
+            return f"{prior_user_turns[-1]} {question}".strip()
+        return question
+
+    def _format_history_for_prompt(self, history: list) -> str:
+        if not history:
+            return ""
+        recent = history[-4:]
+        return "\n".join(f"{message.role.title()}: {message.content.strip()}" for message in recent if message.content.strip())
+
+    def _history_context_snippet(self, history: list) -> str:
+        if not history:
+            return ""
+        user_messages = [message.content.strip() for message in history if getattr(message, "role", "") == "user" and message.content.strip()]
+        if not user_messages:
+            return ""
+        return user_messages[-1][:220]
+
+    def _plain_language_summary(self, source: SourceDocument) -> str:
+        excerpt = re.sub(r"\s+", " ", source.excerpt).strip()
+        sentence = re.split(r"(?<=[.!?])\s+", excerpt)[0].strip()
+        if sentence:
+            return sentence
+        return excerpt[:220]
+
+    def _grounding_fragments(self, source: SourceDocument) -> list[str]:
+        fragments: list[str] = []
+        fragments.append(source.title.lower())
+        fragments.extend(
+            fragment.lower()
+            for fragment in re.split(r"(?<=[.!?])\s+", source.excerpt)
+            if fragment.strip()
+        )
+        return [fragment[:180] for fragment in fragments if len(fragment.strip()) >= 12]
+
+    def _suggest_question_specific_steps(self, question: str, sources: list[SourceDocument]) -> list[str]:
+        _ = sources
+        normalized = question.lower()
+        if any(keyword in normalized for keyword in ["fir", "complaint", "police"]):
+            return [
+                "Prepare a clear chronology with dates, times, location, and names.",
+                "Attach original screenshots, recordings, IDs, or other primary evidence.",
+                "Ask for a receiving copy or FIR number after submission.",
+            ]
+        if any(keyword in normalized for keyword in ["cyber", "otp", "fraud", "online"]):
+            return [
+                "Preserve bank alerts, transaction IDs, device details, and call records.",
+                "Document the exact timeline of the fraud before memories fade.",
+                "Speak with a lawyer if recovery, freezing, or police escalation is urgent.",
+            ]
+        if any(keyword in normalized for keyword in ["tenant", "landlord", "deposit", "property"]):
+            return [
+                "Keep the rent agreement, payment proof, and written communication in one file.",
+                "Send a written demand before moving to a formal notice where appropriate.",
+                "Consult a property lawyer before filing if facts are disputed.",
+            ]
+        if any(keyword in normalized for keyword in ["arrest", "detention", "bail"]):
+            return [
+                "Record the time, place, and grounds communicated for the arrest or detention.",
+                "Inform a relative or trusted person immediately and request legal assistance.",
+                "Preserve any paperwork, medical records, or witness details linked to the incident.",
+            ]
+        return [
+            "Preserve the original documents and communications linked to the issue.",
+            "Write down the chronology in plain language before taking the next legal step.",
+            "Get a lawyer to review the facts if the matter could lead to police or court action.",
+        ]
 
     def _fallback_answer(self, sources: list[SourceDocument]) -> str:
         if not sources:
             return "No matching legal materials were retrieved. Rephrase the question or expand the legal corpus."
         lead = sources[0]
-        return f"The strongest retrieved authority is {lead.citation}. Review the cited material and consult counsel before acting."
+        return (
+            f"The strongest grounded authority retrieved for this question is {lead.citation}. "
+            "Review that source carefully and have a qualified lawyer check how it applies to your facts."
+        )
 
     def _fallback_reasoning(self, sources: list[SourceDocument]) -> str:
         return "The incident pattern overlaps with the retrieved provisions, subject to factual verification and procedural requirements."

@@ -19,6 +19,7 @@ def load_config(path: str) -> dict:
 def format_example(example: dict) -> str:
     return (
         "<s>[INST] You are NyayaSetu, a legal AI assistant for Indian law.\n"
+        "Answer in plain language, stay grounded in the supplied legal context, and include practical next steps when useful.\n"
         f"Instruction: {example['instruction']}\n"
         f"Context: {example['input']} [/INST]\n"
         f"{example['output']}</s>"
@@ -70,9 +71,14 @@ def main() -> None:
         logging_steps=int(config["logging_steps"]),
         save_steps=int(config["save_steps"]),
         eval_steps=int(config["eval_steps"]),
+        warmup_ratio=float(config.get("warmup_ratio", 0.03)),
+        weight_decay=float(config.get("weight_decay", 0.0)),
+        max_grad_norm=float(config.get("max_grad_norm", 1.0)),
         evaluation_strategy="steps",
         save_strategy="steps",
         bf16=True,
+        gradient_checkpointing=bool(config.get("gradient_checkpointing", False)),
+        optim="paged_adamw_8bit",
         report_to="none",
     )
     trainer = SFTTrainer(
@@ -92,4 +98,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

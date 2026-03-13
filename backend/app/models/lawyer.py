@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Integer, String, Text
+from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Integer, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.session import Base
@@ -73,3 +73,43 @@ class LawyerPost(Base):
     comment_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+
+
+class LawyerFollow(Base):
+    __tablename__ = "lawyer_follows"
+    __table_args__ = (UniqueConstraint("lawyer_profile_id", "user_id", name="uq_lawyer_follow_profile_user"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    lawyer_profile_id: Mapped[int] = mapped_column(
+        Integer,
+        ForeignKey("lawyer_profiles.id"),
+        nullable=False,
+        index=True,
+    )
+    user_id: Mapped[str] = mapped_column(
+        String(64),
+        ForeignKey("users.id"),
+        nullable=False,
+        index=True,
+    )
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+
+
+class LawyerPostLike(Base):
+    __tablename__ = "lawyer_post_likes"
+    __table_args__ = (UniqueConstraint("lawyer_post_id", "user_id", name="uq_lawyer_post_like_user"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    lawyer_post_id: Mapped[int] = mapped_column(
+        Integer,
+        ForeignKey("lawyer_posts.id"),
+        nullable=False,
+        index=True,
+    )
+    user_id: Mapped[str] = mapped_column(
+        String(64),
+        ForeignKey("users.id"),
+        nullable=False,
+        index=True,
+    )
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)

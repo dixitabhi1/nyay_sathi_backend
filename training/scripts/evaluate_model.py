@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 
 import evaluate
 from datasets import load_dataset
@@ -23,9 +24,18 @@ def main() -> None:
     predictions: list[str] = []
     references: list[str] = []
     for row in dataset:
-        prompt = f"Instruction: {row['instruction']}\nContext: {row['input']}\nAnswer:"
+        prompt = (
+            "You are NyayaSetu, a legal AI assistant for Indian law. "
+            "Answer in plain language and stay grounded in the provided context.\n"
+            f"Instruction: {row['instruction']}\nContext: {row['input']}\nAnswer:"
+        )
         output = generator(prompt, max_new_tokens=256, do_sample=False)[0]["generated_text"]
-        predictions.append(output.split("Answer:", 1)[-1].strip())
+        raw_prediction = output.split("Answer:", 1)[-1].strip()
+        try:
+            parsed = json.loads(raw_prediction)
+            predictions.append(parsed.get("answer", raw_prediction).strip())
+        except json.JSONDecodeError:
+            predictions.append(raw_prediction)
         references.append(row["output"])
 
     scores = rouge.compute(predictions=predictions, references=references)
