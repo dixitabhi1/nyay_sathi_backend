@@ -11,18 +11,42 @@ from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
 from trl import SFTConfig, SFTTrainer
 
 
+DEFAULT_SYSTEM_PROMPT = (
+    "You are NyayaSetu, a legal AI assistant for Indian law. "
+    "Answer in plain language, stay grounded in the supplied legal context, cite the most relevant sections when available, "
+    "and give practical next steps when the context supports them. "
+    "Do not invent facts or legal conclusions that are not supported by the context."
+)
+
+
 def load_config(path: str) -> dict:
     with open(path, "r", encoding="utf-8") as handle:
         return yaml.safe_load(handle)
 
 
-def format_example(example: dict) -> str:
+def build_user_message(example: dict) -> str:
+    context = (example.get("input") or "").strip()
+    if context:
+        return f"Question: {example['instruction'].strip()}\n\nGrounded legal context:\n{context}"
+    return f"Question: {example['instruction'].strip()}"
+
+
+def format_example(example: dict, tokenizer, system_prompt: str) -> str:
+    messages = [
+        {"role": "system", "content": system_prompt},
+        {"role": "user", "content": build_user_message(example)},
+        {"role": "assistant", "content": example["output"].strip()},
+    ]
+    if hasattr(tokenizer, "apply_chat_template"):
+        return tokenizer.apply_chat_template(
+            messages,
+            tokenize=False,
+            add_generation_prompt=False,
+        )
     return (
-        "<s>[INST] You are NyayaSetu, a legal AI assistant for Indian law.\n"
-        "Answer in plain language, stay grounded in the supplied legal context, and include practical next steps when useful.\n"
-        f"Instruction: {example['instruction']}\n"
-        f"Context: {example['input']} [/INST]\n"
-        f"{example['output']}</s>"
+        f"System: {system_prompt}\n"
+        f"User: {build_user_message(example)}\n"
+        f"Assistant: {example['output'].strip()}"
     )
 
 
@@ -67,6 +91,7 @@ def write_run_metadata(
         "per_device_train_batch_size": config["per_device_train_batch_size"],
         "gradient_accumulation_steps": config["gradient_accumulation_steps"],
         "mixed_precision": config.get("mixed_precision", "auto"),
+        "system_prompt": config.get("system_prompt", DEFAULT_SYSTEM_PROMPT),
         "torch_version": str(torch.__version__),
         "cuda_version": str(torch.version.cuda),
         "gpu_name": torch.cuda.get_device_name(0) if torch.cuda.is_available() else None,
@@ -114,6 +139,7 @@ def main() -> None:
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
     tokenizer.padding_side = "right"
+    system_prompt = str(config.get("system_prompt", DEFAULT_SYSTEM_PROMPT)).strip()
 
     mixed_precision = str(config.get("mixed_precision", "auto")).lower()
     use_bf16 = mixed_precision == "bf16" or (
@@ -207,7 +233,7 @@ def main() -> None:
         eval_dataset=dataset["eval"] if has_eval else None,
         processing_class=tokenizer,
         peft_config=peft_config,
-        formatting_func=format_example,
+        formatting_func=lambda example: format_example(example, tokenizer, system_prompt),
         args=training_args,
     )
     trainer.train(resume_from_checkpoint=resume_from_checkpoint)

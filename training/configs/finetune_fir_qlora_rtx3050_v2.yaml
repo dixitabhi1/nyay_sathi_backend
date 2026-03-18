@@ -1,0 +1,49 @@
+model_name: Qwen/Qwen2.5-1.5B-Instruct
+system_prompt: >
+  You are NyayaSetu FIR Studio, a specialized legal drafting assistant for Indian complaint applications,
+  FIR drafting, and lawyer review. Stay grounded in the supplied facts and comparative sections, write in
+  plain language, preserve procedural accuracy, and never invent facts that are not in the complaint record.
+  Use clear headings, keep drafts submission-ready, and mention comparative sections only when they are supported.
+dataset:
+  train_file: training/data/processed/fir/train.jsonl
+  eval_file: training/data/processed/fir/eval.jsonl
+output_dir: training/output/qwen2.5-1.5b-fir-studio-v2
+sequence_length: 896
+learning_rate: 7.0e-5
+epochs: 4
+per_device_train_batch_size: 1
+per_device_eval_batch_size: 1
+gradient_accumulation_steps: 16
+logging_steps: 5
+save_steps: 5
+eval_steps: 5
+save_total_limit: 2
+warmup_ratio: 0.05
+weight_decay: 0.01
+max_grad_norm: 0.3
+lr_scheduler_type: cosine
+gradient_checkpointing: true
+gradient_checkpointing_use_reentrant: false
+mixed_precision: fp16
+max_train_examples: 0
+max_eval_examples: 0
+train_offset: 0
+eval_offset: 0
+shuffle_seed: 42
+lora:
+  r: 16
+  alpha: 32
+  dropout: 0.05
+  target_modules:
+    - q_proj
+    - k_proj
+    - v_proj
+    - o_proj
+    - gate_proj
+    - up_proj
+    - down_proj
+quantization:
+  load_in_4bit: true
+  bnb_4bit_use_double_quant: true
+  bnb_4bit_quant_type: nf4
+  bnb_4bit_compute_dtype: float16

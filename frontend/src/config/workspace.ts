@@ -2,67 +2,80 @@ export type ModuleKey = "chat" | "case" | "research" | "draft" | "contract" | "e
 
 export const modules: Record<ModuleKey, { title: string; description: string; actionLabel: string }> = {
   chat: {
-    title: "AI Legal Chatbot",
-    description: "Ask legal questions and get RAG-grounded answers with citations from statutes and case passages.",
-    actionLabel: "Ask NyayaSetu",
+    title: "AI Legal Assistant",
+    description: "Ask legal questions in plain language and get grounded guidance with statutory citations and next steps.",
+    actionLabel: "Ask Legal Assistant",
   },
   case: {
-    title: "Case Analysis Engine",
-    description: "Map incident facts to likely laws, evidence requirements, punishment context, and next steps.",
-    actionLabel: "Analyze Case",
+    title: "Case Analysis",
+    description: "Turn incident facts into possible BNS or IPC sections, reasoning, likely charges, and recommended actions.",
+    actionLabel: "Analyze My Case",
   },
   research: {
-    title: "Legal Research Engine",
-    description: "Search bare acts, statutes, and legal passages through semantic retrieval.",
-    actionLabel: "Run Research",
+    title: "Bare Acts & Legal Knowledge Base",
+    description: "Search BNS, BNSS, IPC, judgments, and legal passages through semantic retrieval and official citations.",
+    actionLabel: "Search Legal Knowledge",
   },
   draft: {
-    title: "Legal Document Drafting",
-    description: "Generate notices, complaints, affidavits, and structured legal drafts for review.",
-    actionLabel: "Generate Draft",
+    title: "Complaint & Legal Drafting",
+    description: "Convert citizen issues into legal complaints, notices, and formal drafts that can be reviewed and edited.",
+    actionLabel: "Generate Complaint Draft",
   },
   contract: {
-    title: "Contract Analysis",
-    description: "Review contracts for clause extraction, risks, and missing protections.",
-    actionLabel: "Analyze Contract",
+    title: "Legal Vault",
+    description: "Review contracts, store legal documents, and inspect clause-level risk with a lawyer-ready preview.",
+    actionLabel: "Open Legal Vault",
   },
   evidence: {
-    title: "Evidence Analyzer",
-    description: "Extract text, entities, and timeline clues from uploaded or pasted evidence.",
-    actionLabel: "Analyze Evidence",
+    title: "Complaint Upload & OCR",
+    description: "Upload complaint images, PDFs, or evidence files and extract structured text, entities, and timelines.",
+    actionLabel: "Analyze Uploaded Evidence",
   },
   fir: {
-    title: "FIR Generator",
-    description: "Prepare editable FIR drafts from manual entry, complaint uploads, and voice input.",
-    actionLabel: "Open FIR Workspace",
+    title: "File Complaint & Voice FIR",
+    description: "Draft editable FIRs from manual forms, uploaded complaints, or voice narration for police review.",
+    actionLabel: "Open Complaint Workspace",
   },
   strength: {
-    title: "Case Strength Prediction",
-    description: "Estimate the readiness of a case based on evidence, witness support, and procedure.",
-    actionLabel: "Score Case Strength",
+    title: "Track Case & Case Strength",
+    description: "Estimate case readiness and track investigation quality using evidence, witness support, and procedure.",
+    actionLabel: "Evaluate Case Readiness",
   },
 };
 
-export const moduleOrder: ModuleKey[] = ["chat", "case", "research", "draft", "contract", "evidence", "fir", "strength"];
+export const moduleOrder: ModuleKey[] = ["chat", "fir", "case", "research", "draft", "evidence", "contract", "strength"];
+
+export const platformNavigation = [
+  { label: "Home", section: "hero" },
+  { label: "AI Legal Assistant", module: "chat" as ModuleKey, section: "workspace" },
+  { label: "File Complaint", module: "fir" as ModuleKey, section: "workspace" },
+  { label: "Voice FIR", module: "fir" as ModuleKey, section: "workspace" },
+  { label: "Case Analysis", module: "case" as ModuleKey, section: "workspace" },
+  { label: "Find Lawyers", section: "lawyer-marketplace" },
+  { label: "Lawyer Network", section: "lawyer-network" },
+  { label: "Bare Acts", module: "research" as ModuleKey, section: "workspace" },
+  { label: "Legal Vault", module: "contract" as ModuleKey, section: "workspace" },
+  { label: "Track Case", module: "strength" as ModuleKey, section: "workspace" },
+] as const;
 
 export const rightRailPrompts = [
+  "My landlord is refusing to return my deposit.",
+  "Draft a complaint for cyber fraud and OTP theft.",
   "Explain BNS theft in simple language.",
-  "Draft a legal notice for non-payment.",
-  "Analyze a cyber fraud complaint.",
   "Summarize a Supreme Court bail judgment.",
-  "Review a rental agreement for missing clauses.",
-  "Prepare an FIR draft for mobile theft.",
+  "Prepare a voice FIR for phone theft near a market.",
+  "Find a criminal lawyer in Delhi with 8 years experience.",
 ];
 
 export const quickLinks = [
-  "AI Legal Chatbot",
-  "Case Analysis Engine",
-  "Legal Research Engine",
-  "Legal Document Drafting",
-  "Contract Analysis",
-  "Evidence Analyzer",
-  "FIR Generator",
-  "Case Strength Prediction",
+  "Citizens",
+  "Police",
+  "Verified Lawyers",
+  "Lawyer Network",
+  "Voice FIR",
+  "OCR Complaints",
+  "Bare Acts",
+  "Legal Vault",
 ];
 
 export const samplePrompts: Record<Exclude<ModuleKey, "fir">, string[]> = {
@@ -105,25 +118,120 @@ export const samplePrompts: Record<Exclude<ModuleKey, "fir">, string[]> = {
 
 export const exploreCards = [
   {
-    title: "RAG-Powered Legal Guidance",
-    description: "Every answer is tied to retrieved legal materials instead of unsupported free-text generation.",
-    tone: "blue",
+    title: "AI Complaint Assistant",
+    description: "Describe a legal problem in simple language and turn it into a structured complaint or FIR-ready narrative.",
+    tone: "navy",
   },
   {
-    title: "Citizen and Police Workflows",
-    description: "Support FIR drafting, case intake, evidence review, and legal research in one platform.",
-    tone: "purple",
+    title: "Voice FIR Filing",
+    description: "Narrate a complaint naturally and let NyayaSetu convert it into an editable FIR draft for review.",
+    tone: "gold",
   },
   {
-    title: "Self-Hosted AI Stack",
-    description: "Use open-source models, FAISS retrieval, FastAPI services, and local document pipelines.",
-    tone: "green",
+    title: "Case Analysis Engine",
+    description: "Map incident facts to possible IPC or BNS sections, legal reasoning, likely charges, and next steps.",
+    tone: "stone",
   },
   {
-    title: "Editable Legal Previews",
-    description: "Render readable outputs with download-ready previews instead of raw JSON payloads.",
-    tone: "amber",
+    title: "Complaint Upload with OCR",
+    description: "Upload complaint images or PDFs and extract structured legal fields through OCR and document analysis.",
+    tone: "platinum",
   },
+  {
+    title: "Crime Pattern Detection",
+    description: "Track repeated crimes by location, incident type, and historical FIR records to surface hotspots.",
+    tone: "navy",
+  },
+  {
+    title: "Legal Knowledge Base",
+    description: "Search bare acts, BNS, BNSS, IPC, and important judgments with grounded, simple-language explanations.",
+    tone: "gold",
+  },
+] as const;
+
+export const lawyerProfiles = [
+  {
+    name: "Advocate Ananya Sharma",
+    handle: "@adv_sharma",
+    practice: "Criminal Law",
+    court: "Delhi High Court",
+    experience: "8 years",
+    location: "New Delhi",
+    rating: "4.9",
+    fee: "INR 2,500",
+  },
+  {
+    name: "Advocate Rohan Mehta",
+    handle: "@justice_rohan",
+    practice: "Cyber Crime",
+    court: "Mumbai Sessions Court",
+    experience: "11 years",
+    location: "Mumbai",
+    rating: "4.8",
+    fee: "INR 3,000",
+  },
+  {
+    name: "Advocate Saba Khan",
+    handle: "@legal_saba",
+    practice: "Family & Property",
+    court: "Lucknow Bench",
+    experience: "6 years",
+    location: "Lucknow",
+    rating: "4.7",
+    fee: "INR 1,800",
+  },
+] as const;
+
+export const lawyerNetworkFeed = [
+  {
+    author: "Advocate Ananya Sharma",
+    handle: "@adv_sharma",
+    category: "Judgment Insight",
+    title: "How courts are reading digital evidence in recent criminal proceedings",
+    excerpt: "A short breakdown of what makes screenshots, call records, and recovery memos persuasive during early-stage criminal investigation.",
+    stats: "128 likes · 24 comments",
+  },
+  {
+    author: "Advocate Rohan Mehta",
+    handle: "@justice_rohan",
+    category: "Citizen Q&A",
+    title: "What should a victim preserve after OTP fraud?",
+    excerpt: "The practical answer is not only bank statements. Preserve the call log, complaint number, device details, and communication chain immediately.",
+    stats: "94 likes · 17 comments",
+  },
+  {
+    author: "Advocate Saba Khan",
+    handle: "@legal_saba",
+    category: "Bare Act Thread",
+    title: "Tenant deposit disputes: when negotiation should end and legal notice should begin",
+    excerpt: "A practical thread on using documentary trail, timelines, and jurisdiction before escalating to formal complaint drafting.",
+    stats: "73 likes · 11 comments",
+  },
+] as const;
+
+export const policeDashboardCards = [
+  {
+    title: "Complaint Review Queue",
+    value: "26 pending",
+    detail: "OCR-normalized complaints waiting for station-level verification.",
+  },
+  {
+    title: "Voice FIR Drafts",
+    value: "11 generated",
+    detail: "Citizen voice complaints converted into FIR-ready structured drafts.",
+  },
+  {
+    title: "Hotspot Signals",
+    value: "3 active zones",
+    detail: "Repeated theft and intimidation patterns detected in the last 7 days.",
+  },
+] as const;
+
+export const citizenAssistantHighlights = [
+  "Possible legal provisions",
+  "Suggested actions",
+  "Draft complaint",
+  "Recommended lawyers",
 ] as const;
 
 export function fillCasePreset(preset: string) {

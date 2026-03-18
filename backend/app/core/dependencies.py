@@ -9,6 +9,7 @@ from app.services.crime_pattern import CrimePatternService
 from app.services.evidence_intelligence import EvidenceIntelligenceService
 from app.services.fir_extraction import FIRExtractionService
 from app.services.fir_completeness import FIRCompletenessService
+from app.services.fir_generation import FIRGenerationService
 from app.services.fir_service import FIRService
 from app.services.history import UserHistoryService
 from app.services.corpus_registry import CorpusRegistry
@@ -65,6 +66,11 @@ def get_fir_extraction_service() -> FIRExtractionService:
 @lru_cache
 def get_fir_completeness_service() -> FIRCompletenessService:
     return FIRCompletenessService()
+
+
+@lru_cache
+def get_fir_generation_service() -> FIRGenerationService:
+    return FIRGenerationService(get_settings())
 
 
 @lru_cache
@@ -125,6 +131,7 @@ def get_fir_service() -> FIRService:
         document_ingestion=get_document_ingestion_service(),
         extraction_service=get_fir_extraction_service(),
         classifier=get_legal_section_classifier(),
+        generation_service=get_fir_generation_service(),
         completeness_service=get_fir_completeness_service(),
         jurisdiction_service=get_jurisdiction_service(),
         evidence_intelligence=get_evidence_intelligence_service(),

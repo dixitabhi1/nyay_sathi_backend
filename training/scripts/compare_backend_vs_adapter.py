@@ -16,6 +16,12 @@ from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 BACKEND_ROOT = REPO_ROOT / "backend"
+DEFAULT_SYSTEM_PROMPT = (
+    "You are NyayaSetu, a legal AI assistant for Indian law. "
+    "Answer in plain language, stay grounded in the supplied legal context, cite the most relevant sections when available, "
+    "and give practical next steps when the context supports them. "
+    "Do not invent facts or legal conclusions that are not supported by the context."
+)
 
 
 def load_yaml(path: Path) -> dict:
@@ -56,17 +62,35 @@ def format_sources_for_adapter(sources: list) -> str:
     return "\n\n".join(blocks)
 
 
-def build_adapter_prompt(question: str, source_context: str) -> str:
-    return (
-        "<s>[INST] You are NyayaSetu, a legal AI assistant for Indian law.\n"
-        "Answer in plain language, stay grounded in the supplied legal context, and include practical next steps when useful.\n"
-        f"Instruction: {question}\n"
-        f"Context: {source_context} [/INST]\n"
-    )
+def build_adapter_prompt(question: str, source_context: str, tokenizer, system_prompt: str) -> str:
+    user_content = f"Question: {question}\n\nGrounded legal context:\n{source_context}"
+    messages = [
+        {"role": "system", "content": system_prompt},
+        {"role": "user", "content": user_content},
+    ]
+    if hasattr(tokenizer, "apply_chat_template"):
+        return tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
+    return f"System: {system_prompt}\nUser: {user_content}\nAssistant:"
 
 
-def generate_adapter_answer(model, tokenizer, question: str, source_context: str, max_new_tokens: int) -> str:
-    prompt = build_adapter_prompt(question, source_context)
+def clean_generated_answer(answer: str) -> str:
+    cleaned = answer.strip()
+    for marker in ("</s>", "<|im_end|>", "<|endoftext|>", "[/INST]"):
+        cleaned = cleaned.replace(marker, "")
+    cleaned = re.sub(r"<\|.*?\|>", "", cleaned)
+    cleaned = re.sub(r"\n{3,}", "\n\n", cleaned)
+    return cleaned.strip()
+
+
+def generate_adapter_answer(
+    model,
+    tokenizer,
+    question: str,
+    source_context: str,
+    max_new_tokens: int,
+    system_prompt: str,
+) -> str:
+    prompt = build_adapter_prompt(question, source_context, tokenizer, system_prompt)
     inputs = tokenizer(prompt, return_tensors="pt")
     model_device = getattr(model, "device", torch.device("cuda" if torch.cuda.is_available() else "cpu"))
     inputs = {key: value.to(model_device) for key, value in inputs.items()}
@@ -79,6 +103,7 @@ def generate_adapter_answer(model, tokenizer, question: str, source_context: str
         )
     generated_ids = output_ids[0][inputs["input_ids"].shape[1] :]
     answer = tokenizer.decode(generated_ids, skip_special_tokens=True).strip()
+    answer = clean_generated_answer(answer)
     return answer or "[No answer generated.]"
 
 
@@ -192,6 +217,7 @@ def main() -> None:
     tokenizer = AutoTokenizer.from_pretrained(train_config["model_name"], use_fast=True, local_files_only=args.offline)
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
+    system_prompt = str(train_config.get("system_prompt", DEFAULT_SYSTEM_PROMPT)).strip()
 
     quantization_config = BitsAndBytesConfig(
         load_in_4bit=train_config["quantization"]["load_in_4bit"],
@@ -220,6 +246,7 @@ def main() -> None:
             question=question,
             source_context=source_context,
             max_new_tokens=args.max_new_tokens,
+            system_prompt=system_prompt,
         )
         source_citations = [source.citation for source in backend_response.sources]
         backend_features = extract_answer_features(backend_response.answer, source_citations)

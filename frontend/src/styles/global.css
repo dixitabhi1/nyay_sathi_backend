@@ -656,6 +656,82 @@ button {
   line-height: 1.5;
 }
 
+.fir-tab.locked {
+  opacity: 0.72;
+}
+
+.secondary-tabs {
+  margin-top: 18px;
+}
+
+.comparison-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.comparison-column {
+  padding: 14px;
+  border-radius: 16px;
+  border: 1px solid var(--border);
+  background: var(--panel-soft);
+}
+
+.comparison-column h4 {
+  margin: 0 0 10px;
+}
+
+.compact-section-list {
+  gap: 10px;
+}
+
+.compact-form {
+  gap: 10px;
+}
+
+.account-card {
+  display: grid;
+  gap: 12px;
+}
+
+.mini-toggle {
+  display: inline-flex;
+  padding: 4px;
+  border-radius: 999px;
+  background: var(--panel-soft);
+  border: 1px solid var(--border);
+}
+
+.mini-toggle button {
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  border-radius: 999px;
+  padding: 8px 12px;
+  cursor: pointer;
+}
+
+.mini-toggle button.active {
+  background: var(--accent-soft);
+  color: var(--copy);
+}
+
+.account-status-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.status-pill.muted,
+.mini-pill.pending {
+  opacity: 0.7;
+}
+
+.mini-pill.approved {
+  background: #e2f6ea;
+  color: #166534;
+}
+
 .fir-form label {
   display: block;
   margin-bottom: 16px;

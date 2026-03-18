@@ -11,11 +11,13 @@ from app.db.session import SessionLocal
 from app.models.fir import FIREvidence, FIRIntelligence, FIRRecord, FIRVersion
 from app.schemas.fir import (
     AI_FIR_DISCLAIMER,
+    FIRComparativeSectionsResponse,
     FIRCompletenessResponse,
     FIRCrimePatternResponse,
     FIREvidenceAnalysisResponse,
     FIREvidenceItem,
     FIRDraftUpdateRequest,
+    FIRGeneratedDocument,
     FIRIntelligenceResponse,
     FIRJurisdictionSuggestion,
     FIRJurisdictionRequest,
@@ -37,6 +39,7 @@ from app.services.document_ingestion import DocumentIngestionService
 from app.services.evidence_intelligence import EvidenceIntelligenceService
 from app.services.fir_completeness import FIRCompletenessService
 from app.services.fir_extraction import FIRExtractionService
+from app.services.fir_generation import FIRGenerationService
 from app.services.jurisdiction import JurisdictionService
 from app.services.legal_section_classifier import LegalSectionClassifier
 
@@ -47,6 +50,7 @@ class FIRService:
         document_ingestion: DocumentIngestionService,
         extraction_service: FIRExtractionService,
         classifier: LegalSectionClassifier,
+        generation_service: FIRGenerationService,
         completeness_service: FIRCompletenessService,
         jurisdiction_service: JurisdictionService,
         evidence_intelligence: EvidenceIntelligenceService,
@@ -55,6 +59,7 @@ class FIRService:
         self.document_ingestion = document_ingestion
         self.extraction_service = extraction_service
         self.classifier = classifier
+        self.generation_service = generation_service
         self.completeness_service = completeness_service
         self.jurisdiction_service = jurisdiction_service
         self.evidence_intelligence = evidence_intelligence
@@ -75,7 +80,15 @@ class FIRService:
             witness_details=payload.witness_details,
             evidence_information=payload.evidence_information,
         )
-        return self._persist_fir_record("manual", structured, None, payload.user_id)
+        return self._persist_fir_record(
+            workflow="manual",
+            structured=structured,
+            transcript_text=None,
+            user_id=payload.user_id,
+            draft_role=payload.draft_role,
+            draft_language=payload.language,
+            source_application_text=None,
+        )
 
     def preview_manual_fir(self, payload: FIRManualRequest) -> FIRUploadIntakeResponse:
         structured = FIRStructuredData(
@@ -93,27 +106,38 @@ class FIRService:
             evidence_information=payload.evidence_information,
         )
         sections, reasoning = self.classifier.classify(structured.incident_description)
+        comparative_sections = self.classifier.compare_sections(structured.incident_description, sections)
         completeness = self.completeness_service.evaluate(structured)
         jurisdiction = self.jurisdiction_service.suggest(structured.incident_location or structured.police_station)
         score, score_reasons = self._score_fir(structured)
-        draft = self._compose_draft(structured, sections, 1)
+        documents = self.generation_service.generate_document_bundle(
+            structured,
+            comparative_sections,
+            language=payload.language,
+            source_application_text=None,
+        )
+        draft = self._select_document_content(documents, payload.draft_role)
         return FIRUploadIntakeResponse(
             extracted_data=structured,
             transcript_text=None,
             cleaned_text=structured.incident_description,
             sections=sections,
+            comparative_sections=comparative_sections,
             legal_reasoning=reasoning,
             jurisdiction=jurisdiction,
             completeness=completeness,
             case_strength_score=score,
             case_strength_reasoning=score_reasons,
             draft_text=draft,
+            generated_documents=documents,
         )
 
     async def create_fir_from_upload(
         self,
         complaint_file: UploadFile,
         police_station: str | None = None,
+        draft_role: str = "police_fir",
+        draft_language: str = "en",
         user_id: str | None = None,
     ) -> FIRRecordResponse:
         saved_path = await self.document_ingestion.save_upload(complaint_file)
@@ -122,7 +146,15 @@ class FIRService:
             extracted_text,
             defaults={"police_station": police_station},
         )
-        response = self._persist_fir_record("upload", structured, None, user_id)
+        response = self._persist_fir_record(
+            workflow="upload",
+            structured=structured,
+            transcript_text=None,
+            user_id=user_id,
+            draft_role=draft_role,
+            draft_language=draft_language,
+            source_application_text=extracted_text,
+        )
         self._attach_saved_evidence(
             response.fir_id,
             complaint_file.filename or Path(saved_path).name,
@@ -135,26 +167,37 @@ class FIRService:
         self,
         complaint_file: UploadFile,
         police_station: str | None = None,
+        draft_role: str = "police_fir",
+        draft_language: str = "en",
     ) -> FIRUploadIntakeResponse:
         extracted_text = await self.document_ingestion.extract_text(complaint_file)
         cleaned_text = self.extraction_service.clean_text(extracted_text)
         structured = self.extraction_service.extract_from_text(cleaned_text, defaults={"police_station": police_station})
         sections, reasoning = self.classifier.classify(structured.incident_description)
+        comparative_sections = self.classifier.compare_sections(structured.incident_description, sections)
         completeness = self.completeness_service.evaluate(structured)
         jurisdiction = self.jurisdiction_service.suggest(structured.incident_location or police_station)
         score, score_reasons = self._score_fir(structured)
-        draft = self._compose_draft(structured, sections, 1)
+        documents = self.generation_service.generate_document_bundle(
+            structured,
+            comparative_sections,
+            language=draft_language,
+            source_application_text=cleaned_text,
+        )
+        draft = self._select_document_content(documents, draft_role)
         return FIRUploadIntakeResponse(
             extracted_data=structured,
             transcript_text=None,
             cleaned_text=cleaned_text,
             sections=sections,
+            comparative_sections=comparative_sections,
             legal_reasoning=reasoning,
             jurisdiction=jurisdiction,
             completeness=completeness,
             case_strength_score=score,
             case_strength_reasoning=score_reasons,
             draft_text=draft,
+            generated_documents=documents,
         )
 
     async def create_fir_from_voice(
@@ -178,7 +221,15 @@ class FIRService:
             defaults = {}
             user_id = None
             structured = self.extraction_service.extract_from_text(transcript_text, defaults=defaults)
-            response = self._persist_fir_record("voice", structured, transcript_text, user_id)
+            response = self._persist_fir_record(
+                workflow="voice",
+                structured=structured,
+                transcript_text=transcript_text,
+                user_id=user_id,
+                draft_role="citizen_application",
+                draft_language="en",
+                source_application_text=transcript_text,
+            )
             self._attach_saved_evidence(
                 response.fir_id,
                 audio_file.filename or Path(saved_path).name,
@@ -190,7 +241,15 @@ class FIRService:
             raise HTTPException(status_code=400, detail="Provide an audio file or transcript text.")
 
         structured = self.extraction_service.extract_from_text(transcript_text, defaults=defaults)
-        return self._persist_fir_record("voice", structured, transcript_text, user_id)
+        return self._persist_fir_record(
+            workflow="voice",
+            structured=structured,
+            transcript_text=transcript_text,
+            user_id=user_id,
+            draft_role=payload.draft_role if payload else "citizen_application",
+            draft_language=payload.language if payload else "en",
+            source_application_text=transcript_text,
+        )
 
     async def preview_voice_processing(
         self,
@@ -211,11 +270,20 @@ class FIRService:
 
         extracted = self.extraction_service.extract_from_text(transcript_text, defaults=defaults)
         sections, _ = self.classifier.classify(extracted.incident_description)
+        comparative_sections = self.classifier.compare_sections(extracted.incident_description, sections)
+        documents = self.generation_service.generate_document_bundle(
+            extracted,
+            comparative_sections,
+            language=payload.language if payload else "en",
+            source_application_text=transcript_text,
+        )
         return FIRVoiceProcessingResponse(
             transcript_text=transcript_text,
             cleaned_text=transcript_text,
             extracted_data=extracted,
             sections=sections,
+            comparative_sections=comparative_sections,
+            generated_documents=documents,
             jurisdiction=self.jurisdiction_service.suggest(extracted.incident_location),
             completeness=self.completeness_service.evaluate(extracted),
         )
@@ -246,6 +314,7 @@ class FIRService:
                     FIRRecordSummary(
                         fir_id=row.id,
                         workflow=row.workflow,
+                        draft_role=row.draft_role,
                         status=row.status,
                         complainant_name=extracted.complainant_name,
                         police_station=extracted.police_station,
@@ -269,7 +338,12 @@ class FIRService:
                 raise HTTPException(status_code=404, detail="FIR record not found.")
             next_version = record.current_version + 1
             now = datetime.utcnow()
+            document_kind = self._normalize_document_kind(payload.document_kind)
+            draft_language = self._normalize_language(payload.language)
+            self._set_document_content(record, document_kind, payload.draft_text)
             record.current_draft = payload.draft_text
+            record.draft_role = document_kind
+            record.draft_language = draft_language
             record.current_version = next_version
             record.updated_at = now
             record.last_edited_at = now
@@ -277,6 +351,8 @@ class FIRService:
                 FIRVersion(
                     fir_id=fir_id,
                     version_number=next_version,
+                    document_kind=document_kind,
+                    language=draft_language,
                     draft_text=payload.draft_text,
                     edited_by=payload.edited_by,
                     edit_summary=payload.edit_summary,
@@ -302,6 +378,8 @@ class FIRService:
                 versions=[
                     FIRVersionItem(
                         version_number=row.version_number,
+                        document_kind=row.document_kind,
+                        language=row.language,
                         draft_text=row.draft_text,
                         edited_by=row.edited_by,
                         edit_summary=row.edit_summary,
@@ -359,8 +437,28 @@ class FIRService:
             jurisdiction=record.jurisdiction,
             completeness=record.completeness or self.completeness_service.evaluate(record.extracted_data),
             bns_prediction=record.sections,
+            comparative_sections=record.comparative_sections,
             crime_pattern=pattern,
         )
+
+    def render_document_pdf(
+        self,
+        fir_id: str,
+        document_kind: str,
+        user_id: str | None = None,
+        language: str | None = None,
+    ) -> tuple[str, bytes]:
+        record = self.get_fir_record(fir_id, user_id=user_id)
+        target_kind = self._normalize_document_kind(document_kind)
+        target_language = self._normalize_language(language or record.draft_language)
+        document = next((item for item in record.generated_documents if item.kind == target_kind and item.language == target_language), None)
+        if document is None:
+            document = next((item for item in record.generated_documents if item.kind == target_kind), None)
+        if document is None:
+            raise HTTPException(status_code=404, detail="Requested FIR document was not found.")
+        pdf_bytes = self.generation_service.render_pdf(document.title, document.content, language=document.language)
+        filename = f"{fir_id}-{target_kind}-{document.language}.pdf"
+        return filename, pdf_bytes
 
     def _persist_fir_record(
         self,
@@ -368,25 +466,44 @@ class FIRService:
         structured: FIRStructuredData,
         transcript_text: str | None,
         user_id: str | None,
+        draft_role: str,
+        draft_language: str,
+        source_application_text: str | None,
     ) -> FIRRecordResponse:
         sections, legal_reasoning = self.classifier.classify(structured.incident_description)
+        comparative_sections = self.classifier.compare_sections(structured.incident_description, sections)
         completeness = self.completeness_service.evaluate(structured)
         jurisdiction = self.jurisdiction_service.suggest(structured.incident_location or structured.police_station)
         score, score_reasons = self._score_fir(structured)
         fir_id = uuid4().hex
-        draft_text = self._compose_draft(structured, sections, 1)
+        normalized_draft_role = self._normalize_document_kind(draft_role)
+        normalized_language = self._normalize_language(draft_language)
+        documents = self.generation_service.generate_document_bundle(
+            structured,
+            comparative_sections,
+            language=normalized_language,
+            source_application_text=source_application_text,
+        )
+        draft_text = self._select_document_content(documents, normalized_draft_role)
         now = datetime.utcnow()
         record = FIRRecord(
             id=fir_id,
             workflow=workflow,
+            draft_role=normalized_draft_role,
+            draft_language=normalized_language,
             status="draft",
             extracted_payload=structured.model_dump_json(),
             transcript_text=transcript_text,
             suggested_sections=json.dumps([section.model_dump() for section in sections], ensure_ascii=True),
+            comparative_sections=comparative_sections.model_dump_json(),
             legal_reasoning=legal_reasoning,
             case_strength_score=score,
             case_strength_reasoning=json.dumps(score_reasons, ensure_ascii=True),
             disclaimer=AI_FIR_DISCLAIMER,
+            citizen_application_text=self._document_content(documents, "citizen_application"),
+            police_fir_text=self._document_content(documents, "police_fir"),
+            lawyer_analysis_text=self._document_content(documents, "lawyer_analysis"),
+            source_application_text=source_application_text,
             current_draft=draft_text,
             current_version=1,
             user_id=user_id,
@@ -418,6 +535,8 @@ class FIRService:
                 FIRVersion(
                     fir_id=fir_id,
                     version_number=1,
+                    document_kind=normalized_draft_role,
+                    language=normalized_language,
                     draft_text=draft_text,
                     edited_by=user_id,
                     edit_summary="Initial AI-generated FIR draft",
@@ -450,6 +569,11 @@ class FIRService:
     ) -> FIRRecordResponse:
         extracted = FIRStructuredData.model_validate_json(record.extracted_payload)
         sections = [FIRSectionSuggestion.model_validate(item) for item in json.loads(record.suggested_sections)]
+        comparative_sections = (
+            FIRComparativeSectionsResponse.model_validate_json(record.comparative_sections)
+            if record.comparative_sections
+            else None
+        )
         score_reasons = json.loads(record.case_strength_reasoning)
         jurisdiction = (
             FIRJurisdictionSuggestion.model_validate_json(intelligence.jurisdiction_payload)
@@ -471,12 +595,17 @@ class FIRService:
         return FIRRecordResponse(
             fir_id=record.id,
             workflow=record.workflow,
+            draft_role=record.draft_role,
+            draft_language=record.draft_language,
             status=record.status,
             extracted_data=extracted,
             transcript_text=record.transcript_text,
+            source_application_text=record.source_application_text,
             sections=sections,
+            comparative_sections=comparative_sections,
             legal_reasoning=record.legal_reasoning,
             draft_text=record.current_draft,
+            generated_documents=self._serialize_documents(record),
             jurisdiction=jurisdiction,
             completeness=completeness,
             case_strength_score=record.case_strength_score,
@@ -495,33 +624,72 @@ class FIRService:
             last_edited_at=record.last_edited_at.isoformat(),
         )
 
-    def _compose_draft(self, structured: FIRStructuredData, sections, version: int) -> str:
-        section_lines = "\n".join(f"- {section.section}: {section.title}" for section in sections)
-        now_label = datetime.utcnow().strftime("%d %B %Y - %I:%M %p")
-        return (
-            "To\n"
-            "Station House Officer\n"
-            f"Police Station: {structured.police_station or '[Insert police station]'}\n\n"
-            "Subject: Complaint regarding cognizable offence\n\n"
-            "Respected Sir/Madam,\n\n"
-            f"I, {structured.complainant_name or '[Insert complainant name]'}"
-            f"{', child of ' + structured.parent_name if structured.parent_name else ''}, "
-            f"resident of {structured.address or '[Insert address]'}, would like to report that on "
-            f"{structured.incident_date or '[Insert date]'}"
-            f"{' at ' + structured.incident_time if structured.incident_time else ''} near "
-            f"{structured.incident_location or '[Insert incident location]'}, the following incident occurred:\n\n"
-            f"{structured.incident_description}\n\n"
-            f"Accused Details: {', '.join(structured.accused_details) or 'Not yet identified.'}\n"
-            f"Witness Details: {', '.join(structured.witness_details) or 'No witness details provided yet.'}\n"
-            f"Evidence Information: {', '.join(structured.evidence_information) or 'No evidence listed yet.'}\n\n"
-            "Applicable Law:\n"
-            f"{section_lines}\n\n"
-            "Kindly register this complaint and take appropriate action.\n\n"
-            f"Signature\n{structured.complainant_name or '[Insert complainant name]'}\n\n"
-            f"Last Edited: {now_label}\n"
-            f"Version: {version}.0\n\n"
-            f"Disclaimer: {AI_FIR_DISCLAIMER}"
-        )
+    def _serialize_documents(self, record: FIRRecord) -> list[FIRGeneratedDocument]:
+        documents: list[FIRGeneratedDocument] = []
+        for kind, title, content in (
+            ("citizen_application", "Citizen Complaint Application", record.citizen_application_text),
+            ("police_fir", "Police FIR Draft", record.police_fir_text),
+            ("lawyer_analysis", "Lawyer FIR Analysis", record.lawyer_analysis_text),
+        ):
+            if not content:
+                continue
+            documents.append(
+                FIRGeneratedDocument(
+                    kind=kind,
+                    title=title,
+                    language=record.draft_language,
+                    content=content,
+                    download_ready=(kind == "citizen_application"),
+                )
+            )
+        if not documents and record.current_draft:
+            documents.append(
+                FIRGeneratedDocument(
+                    kind=record.draft_role or "citizen_application",
+                    title="FIR Draft",
+                    language=record.draft_language or "en",
+                    content=record.current_draft,
+                    download_ready=(record.draft_role == "citizen_application"),
+                )
+            )
+        return documents
+
+    def _select_document_content(self, documents: list[FIRGeneratedDocument], draft_role: str) -> str:
+        normalized = self._normalize_document_kind(draft_role)
+        for item in documents:
+            if item.kind == normalized:
+                return item.content
+        return documents[0].content if documents else ""
+
+    def _document_content(self, documents: list[FIRGeneratedDocument], draft_role: str) -> str | None:
+        normalized = self._normalize_document_kind(draft_role)
+        for item in documents:
+            if item.kind == normalized:
+                return item.content
+        return None
+
+    def _set_document_content(self, record: FIRRecord, document_kind: str, content: str) -> None:
+        if document_kind == "citizen_application":
+            record.citizen_application_text = content
+            return
+        if document_kind == "police_fir":
+            record.police_fir_text = content
+            return
+        if document_kind == "lawyer_analysis":
+            record.lawyer_analysis_text = content
+            return
+        raise HTTPException(status_code=422, detail="Unsupported FIR document kind.")
+
+    def _normalize_document_kind(self, document_kind: str) -> str:
+        normalized = (document_kind or "citizen_application").strip().lower()
+        allowed = {"citizen_application", "police_fir", "lawyer_analysis"}
+        if normalized not in allowed:
+            raise HTTPException(status_code=422, detail="FIR document kind must be citizen_application, police_fir, or lawyer_analysis.")
+        return normalized
+
+    def _normalize_language(self, language: str) -> str:
+        normalized = (language or "en").strip().lower()
+        return normalized if normalized in {"en", "hi"} else "en"
 
     def _score_fir(self, structured: FIRStructuredData) -> tuple[int, list[str]]:
         score = 40

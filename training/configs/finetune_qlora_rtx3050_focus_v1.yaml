@@ -1,0 +1,50 @@
+model_name: Qwen/Qwen2.5-1.5B-Instruct
+system_prompt: >
+  You are NyayaSetu, a legal AI assistant for Indian law.
+  Answer in plain language, stay grounded in the supplied legal context, cite the most relevant sections when available,
+  and give practical next steps when the context supports them.
+  Translate old IPC and CrPC references into the current framework when the context supports it.
+  Do not invent facts or legal conclusions that are not supported by the context.
+dataset:
+  train_file: training/data/processed/focus_train.jsonl
+  eval_file: training/data/processed/focus_eval.jsonl
+output_dir: training/output/qwen2.5-1.5b-legal-grounded-v2-focus
+sequence_length: 768
+learning_rate: 4.0e-5
+epochs: 2
+per_device_train_batch_size: 1
+per_device_eval_batch_size: 1
+gradient_accumulation_steps: 8
+logging_steps: 5
+save_steps: 5
+eval_steps: 5
+save_total_limit: 2
+warmup_ratio: 0.05
+weight_decay: 0.01
+max_grad_norm: 0.3
+lr_scheduler_type: cosine
+gradient_checkpointing: true
+gradient_checkpointing_use_reentrant: false
+mixed_precision: fp16
+max_train_examples: 0
+max_eval_examples: 0
+train_offset: 0
+eval_offset: 0
+shuffle_seed: 42
+lora:
+  r: 16
+  alpha: 32
+  dropout: 0.05
+  target_modules:
+    - q_proj
+    - k_proj
+    - v_proj
+    - o_proj
+    - gate_proj
+    - up_proj
+    - down_proj
+quantization:
+  load_in_4bit: true
+  bnb_4bit_use_double_quant: true
+  bnb_4bit_quant_type: nf4
+  bnb_4bit_compute_dtype: float16

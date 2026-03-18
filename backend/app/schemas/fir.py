@@ -33,10 +33,26 @@ class FIRJurisdictionSuggestion(BaseModel):
 
 
 class FIRSectionSuggestion(BaseModel):
+    statute_code: str = "BNS"
     section: str
     title: str
     reasoning: str
     confidence: float
+
+
+class FIRComparativeSectionsResponse(BaseModel):
+    bns: list[FIRSectionSuggestion] = Field(default_factory=list)
+    bnss: list[FIRSectionSuggestion] = Field(default_factory=list)
+    ipc: list[FIRSectionSuggestion] = Field(default_factory=list)
+    crpc: list[FIRSectionSuggestion] = Field(default_factory=list)
+
+
+class FIRGeneratedDocument(BaseModel):
+    kind: str
+    title: str
+    language: str
+    content: str
+    download_ready: bool = False
 
 
 class FIREvidenceItem(BaseModel):
@@ -49,6 +65,8 @@ class FIREvidenceItem(BaseModel):
 
 class FIRVersionItem(BaseModel):
     version_number: int
+    document_kind: str = "citizen_application"
+    language: str = "en"
     draft_text: str
     edited_by: str | None = None
     edit_summary: str | None = None
@@ -96,18 +114,24 @@ class FIRIntelligenceResponse(BaseModel):
     jurisdiction: FIRJurisdictionSuggestion | None = None
     completeness: FIRCompletenessResponse
     bns_prediction: list[FIRSectionSuggestion]
+    comparative_sections: FIRComparativeSectionsResponse | None = None
     crime_pattern: FIRCrimePatternSummary | None = None
 
 
 class FIRRecordResponse(BaseModel):
     fir_id: str
     workflow: str
+    draft_role: str = "citizen_application"
+    draft_language: str = "en"
     status: str
     extracted_data: FIRStructuredData
     transcript_text: str | None = None
+    source_application_text: str | None = None
     sections: list[FIRSectionSuggestion]
+    comparative_sections: FIRComparativeSectionsResponse | None = None
     legal_reasoning: str
     draft_text: str
+    generated_documents: list[FIRGeneratedDocument] = Field(default_factory=list)
     disclaimer: str = AI_FIR_DISCLAIMER
     jurisdiction: FIRJurisdictionSuggestion | None = None
     completeness: FIRCompletenessResponse | None = None
@@ -121,6 +145,7 @@ class FIRRecordResponse(BaseModel):
 class FIRRecordSummary(BaseModel):
     fir_id: str
     workflow: str
+    draft_role: str = "citizen_application"
     status: str
     complainant_name: str | None = None
     police_station: str | None = None
@@ -149,6 +174,8 @@ class FIRManualRequest(BaseModel):
     accused_details: list[str] = Field(default_factory=list)
     witness_details: list[str] = Field(default_factory=list)
     evidence_information: list[str] = Field(default_factory=list)
+    draft_role: str = Field(default="citizen_application", min_length=3, max_length=48)
+    language: str = Field(default="en", min_length=2, max_length=32)
     user_id: str | None = None
 
 
@@ -157,12 +184,14 @@ class FIRUploadIntakeResponse(BaseModel):
     transcript_text: str | None = None
     cleaned_text: str
     sections: list[FIRSectionSuggestion]
+    comparative_sections: FIRComparativeSectionsResponse | None = None
     legal_reasoning: str
     jurisdiction: FIRJurisdictionSuggestion | None = None
     completeness: FIRCompletenessResponse | None = None
     case_strength_score: int
     case_strength_reasoning: list[str]
     draft_text: str
+    generated_documents: list[FIRGeneratedDocument] = Field(default_factory=list)
     disclaimer: str = AI_FIR_DISCLAIMER
 
 
@@ -170,11 +199,15 @@ class FIRVoiceTranscriptRequest(BaseModel):
     transcript_text: str
     police_station: str | None = None
     complainant_name: str | None = None
+    draft_role: str = Field(default="citizen_application", min_length=3, max_length=48)
+    language: str = Field(default="en", min_length=2, max_length=32)
     user_id: str | None = None
 
 
 class FIRDraftUpdateRequest(BaseModel):
     draft_text: str
+    document_kind: str = Field(default="citizen_application", min_length=3, max_length=48)
+    language: str = Field(default="en", min_length=2, max_length=32)
     edited_by: str | None = None
     edit_summary: str | None = None
 
@@ -189,6 +222,8 @@ class FIRVoiceProcessingResponse(BaseModel):
     cleaned_text: str
     extracted_data: FIRStructuredData
     sections: list[FIRSectionSuggestion]
+    comparative_sections: FIRComparativeSectionsResponse | None = None
+    generated_documents: list[FIRGeneratedDocument] = Field(default_factory=list)
     jurisdiction: FIRJurisdictionSuggestion | None = None
     completeness: FIRCompletenessResponse | None = None
 

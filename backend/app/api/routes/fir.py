@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, File, Form, UploadFile
+from fastapi.responses import StreamingResponse
 
 from app.core.dependencies import get_audit_service, get_fir_service
 from app.core.security import get_optional_current_user
@@ -56,22 +57,37 @@ def preview_manual_fir(
 async def preview_uploaded_complaint(
     complaint_file: UploadFile = File(...),
     police_station: str | None = Form(default=None),
+    draft_role: str = Form(default="police_fir"),
+    language: str = Form(default="en"),
     fir_service: FIRService = Depends(get_fir_service),
 ) -> FIRUploadIntakeResponse:
-    return await fir_service.preview_uploaded_complaint(complaint_file, police_station)
+    return await fir_service.preview_uploaded_complaint(
+        complaint_file,
+        police_station,
+        draft_role=draft_role,
+        draft_language=language,
+    )
 
 
 @router.post("/upload", response_model=FIRRecordResponse)
 async def create_fir_from_upload(
     complaint_file: UploadFile = File(...),
     police_station: str | None = Form(default=None),
+    draft_role: str = Form(default="police_fir"),
+    language: str = Form(default="en"),
     user_id: str | None = Form(default=None),
     fir_service: FIRService = Depends(get_fir_service),
     audit_service: AuditService = Depends(get_audit_service),
     current_user: User | None = Depends(get_optional_current_user),
 ) -> FIRRecordResponse:
     user_id = current_user.id if current_user else user_id
-    response = await fir_service.create_fir_from_upload(complaint_file, police_station, user_id)
+    response = await fir_service.create_fir_from_upload(
+        complaint_file,
+        police_station,
+        draft_role=draft_role,
+        draft_language=language,
+        user_id=user_id,
+    )
     audit_service.log(
         "fir.upload",
         {"filename": complaint_file.filename, "police_station": police_station},
@@ -87,6 +103,8 @@ async def create_fir_from_voice(
     transcript_text: str | None = Form(default=None),
     police_station: str | None = Form(default=None),
     complainant_name: str | None = Form(default=None),
+    draft_role: str = Form(default="citizen_application"),
+    language: str = Form(default="en"),
     user_id: str | None = Form(default=None),
     fir_service: FIRService = Depends(get_fir_service),
     audit_service: AuditService = Depends(get_audit_service),
@@ -99,6 +117,8 @@ async def create_fir_from_voice(
             transcript_text=transcript_text,
             police_station=police_station,
             complainant_name=complainant_name,
+            draft_role=draft_role,
+            language=language,
             user_id=user_id,
         )
     response = await fir_service.create_fir_from_voice(audio_file=audio_file, payload=payload)
@@ -117,6 +137,8 @@ async def preview_voice_processing(
     transcript_text: str | None = Form(default=None),
     police_station: str | None = Form(default=None),
     complainant_name: str | None = Form(default=None),
+    draft_role: str = Form(default="citizen_application"),
+    language: str = Form(default="en"),
     fir_service: FIRService = Depends(get_fir_service),
     current_user: User | None = Depends(get_optional_current_user),
 ) -> FIRVoiceProcessingResponse:
@@ -126,6 +148,8 @@ async def preview_voice_processing(
             transcript_text=transcript_text,
             police_station=police_station,
             complainant_name=complainant_name,
+            draft_role=draft_role,
+            language=language,
             user_id=current_user.id if current_user else None,
         )
     return await fir_service.preview_voice_processing(audio_file=audio_file, payload=payload)
@@ -237,3 +261,24 @@ async def upload_fir_evidence(
         response.model_dump(),
     )
     return response
+
+
+@router.get("/{fir_id}/documents/{document_kind}.pdf")
+def download_fir_document_pdf(
+    fir_id: str,
+    document_kind: str,
+    language: str | None = None,
+    fir_service: FIRService = Depends(get_fir_service),
+    current_user: User | None = Depends(get_optional_current_user),
+) -> StreamingResponse:
+    filename, pdf_bytes = fir_service.render_document_pdf(
+        fir_id,
+        document_kind=document_kind,
+        user_id=current_user.id if current_user else None,
+        language=language,
+    )
+    return StreamingResponse(
+        iter([pdf_bytes]),
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )

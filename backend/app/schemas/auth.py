@@ -8,6 +8,10 @@ class AuthRegisterRequest(BaseModel):
     full_name: str = Field(min_length=2, max_length=255)
     password: str = Field(min_length=8, max_length=128)
     role: str = Field(default="citizen", min_length=3, max_length=64)
+    professional_id: str | None = Field(default=None, max_length=128)
+    organization: str | None = Field(default=None, max_length=255)
+    city: str | None = Field(default=None, max_length=128)
+    preferred_language: str = Field(default="en", min_length=2, max_length=32)
 
 
 class AuthLoginRequest(BaseModel):
@@ -20,6 +24,15 @@ class UserResponse(BaseModel):
     email: str
     full_name: str
     role: str
+    requested_role: str
+    approval_status: str
+    professional_id: str | None = None
+    organization: str | None = None
+    city: str | None = None
+    preferred_language: str
+    approval_notes: str | None = None
+    can_access_lawyer_dashboard: bool = False
+    can_access_police_dashboard: bool = False
     is_active: bool
     created_at: datetime
     last_login_at: datetime | None = None
@@ -35,3 +48,25 @@ class AuthTokenResponse(BaseModel):
 class AuthLogoutResponse(BaseModel):
     success: bool = True
     detail: str = "Logged out successfully."
+
+
+class RoleApprovalRequest(BaseModel):
+    approval_status: str = Field(min_length=4, max_length=32)
+    notes: str | None = Field(default=None, max_length=1000)
+
+
+class PendingRoleApplicationResponse(BaseModel):
+    id: str
+    email: str
+    full_name: str
+    requested_role: str
+    approval_status: str
+    professional_id: str | None = None
+    organization: str | None = None
+    city: str | None = None
+    preferred_language: str
+    created_at: datetime
+
+
+class PendingRoleApplicationsResponse(BaseModel):
+    applications: list[PendingRoleApplicationResponse]

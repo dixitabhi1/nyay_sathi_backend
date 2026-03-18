@@ -297,6 +297,11 @@ class LawyerNetworkService:
                     status_code=status.HTTP_403_FORBIDDEN,
                     detail="Create your lawyer profile before publishing to the network.",
                 )
+            if current_user.role != "lawyer" or current_user.approval_status != "approved":
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Only approved lawyer accounts can publish to the lawyer network.",
+                )
             now = datetime.utcnow()
             post = LawyerPost(
                 lawyer_profile_id=profile.id,
@@ -372,8 +377,12 @@ class LawyerNetworkService:
                 updated_at=now,
             )
             session.add(profile)
-            if current_user and current_user.role != "lawyer":
-                current_user.role = "lawyer"
+            if current_user:
+                current_user.requested_role = "lawyer"
+                current_user.approval_status = "pending" if current_user.role != "lawyer" else current_user.approval_status
+                current_user.professional_id = payload.bar_council_id.strip()
+                current_user.organization = payload.courts_practiced_in.strip()
+                current_user.city = payload.city.strip()
                 current_user.updated_at = now
                 session.add(current_user)
             session.commit()
@@ -396,6 +405,11 @@ class LawyerNetworkService:
         session = SessionLocal()
         try:
             self._ensure_seed_data(session)
+            if current_user.role != "lawyer" or current_user.approval_status != "approved":
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="This dashboard is available only to approved lawyer accounts.",
+                )
             profile = session.query(LawyerProfile).filter(LawyerProfile.user_id == current_user.id).first()
             if not profile:
                 raise HTTPException(

@@ -115,6 +115,13 @@ class Settings(BaseSettings):
     max_generation_tokens: int = Field(default=768, alias="MAX_GENERATION_TOKENS")
     temperature: float = Field(default=0.2, alias="TEMPERATURE")
 
+    fir_inference_provider: str = Field(default="mock", alias="FIR_INFERENCE_PROVIDER")
+    fir_inference_base_url: str = Field(default="http://localhost:8000/v1", alias="FIR_INFERENCE_BASE_URL")
+    fir_inference_model_name: str = Field(default="", alias="FIR_INFERENCE_MODEL_NAME")
+    fir_local_model_name: str = Field(default="", alias="FIR_LOCAL_MODEL_NAME")
+    fir_max_generation_tokens: int = Field(default=900, alias="FIR_MAX_GENERATION_TOKENS")
+    fir_temperature: float = Field(default=0.15, alias="FIR_TEMPERATURE")
+
     upload_dir: Path = Field(default=Path("storage/uploads"), alias="UPLOAD_DIR")
     ocr_language: str = Field(default="eng+hin", alias="OCR_LANGUAGE")
     whisper_model: str = Field(default="tiny", alias="WHISPER_MODEL")

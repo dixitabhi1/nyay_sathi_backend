@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, Query, status
 
 from app.core.dependencies import get_lawyer_network_service
-from app.core.security import get_current_user, get_optional_current_user
+from app.core.security import get_current_lawyer_user, get_current_police_user, get_current_user, get_optional_current_user
 from app.models.auth import User
 from app.schemas.lawyers import (
     LawyerDashboardResponse,
@@ -65,7 +65,7 @@ def lawyer_network_feed(
 def create_network_post(
     payload: LawyerNetworkPostCreateRequest,
     lawyer_service: LawyerNetworkService = Depends(get_lawyer_network_service),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_lawyer_user),
 ) -> LawyerNetworkPostResponse:
     return lawyer_service.create_network_post(payload, current_user=current_user)
 
@@ -83,6 +83,7 @@ def toggle_post_like(
 def police_dashboard(
     limit: int = Query(default=8, ge=1, le=50),
     lawyer_service: LawyerNetworkService = Depends(get_lawyer_network_service),
+    current_user: User = Depends(get_current_police_user),
 ) -> PoliceDashboardResponse:
     return lawyer_service.get_police_dashboard(limit=limit)
 
@@ -90,7 +91,7 @@ def police_dashboard(
 @router.get("/dashboard/me", response_model=LawyerDashboardResponse)
 def lawyer_dashboard(
     lawyer_service: LawyerNetworkService = Depends(get_lawyer_network_service),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_lawyer_user),
 ) -> LawyerDashboardResponse:
     return lawyer_service.get_lawyer_dashboard(current_user=current_user)
 
