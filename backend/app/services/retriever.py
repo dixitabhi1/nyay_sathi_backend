@@ -100,7 +100,7 @@ class Retriever:
 
     def search(self, query: str, top_k: int | None = None) -> list[dict]:
         requested_top_k = top_k or self.settings.top_k_retrieval
-        query_parts = self._decompose_query(query)
+        query_parts = self._expand_query_parts(self._decompose_query(query))
         semantic_hits = self._search_semantic_queries(query_parts, requested_top_k)
         structural_hits = self._search_page_index_queries(query_parts, requested_top_k)
         fused_hits = self._fuse_hits(query, semantic_hits, structural_hits, requested_top_k)
@@ -395,6 +395,8 @@ class Retriever:
             return "bsa"
         if re.search(r"\bipc\b", normalized_query) or "indian penal code" in normalized_query:
             return "ipc"
+        if "information technology act" in normalized_query or re.search(r"\bit act\b", normalized_query):
+            return "it_act"
         return None
 
     def _matches_statute(self, item: dict, statute: str) -> bool:
@@ -428,6 +430,13 @@ class Retriever:
                 or bool(re.search(r"\bipc\b", haystack))
                 or "indian penal code" in haystack
             )
+        if statute == "it_act":
+            return (
+                source_id == "it_act_2000"
+                or source_id.startswith("it_act")
+                or "information technology act" in haystack
+                or "act no. 21 of 2000" in haystack
+            )
         return False
 
     def _decompose_query(self, query: str) -> list[str]:
@@ -447,11 +456,78 @@ class Retriever:
                 break
         return query_parts
 
+    def _expand_query_parts(self, query_parts: list[str]) -> list[str]:
+        if not query_parts:
+            return []
+        base_query = query_parts[0]
+        normalized = base_query.lower()
+        expanded = list(query_parts)
+
+        if "arrest" in normalized and any(keyword in normalized for keyword in ("right", "rights", "bail", "advocate", "lawyer")):
+            expanded.extend(
+                [
+                    "BNSS section 47 grounds of arrest right to bail",
+                    "BNSS section 38 advocate of choice during interrogation",
+                    "BNSS section 478 bail for arrested person without warrant",
+                ]
+            )
+
+        if "fir" in normalized and any(keyword in normalized for keyword in ("cognizable", "register", "registration", "refuse", "refusal")):
+            expanded.extend(
+                [
+                    "BNSS section 173 information relating to cognizable offence free copy to informant",
+                    "CrPC section 154 FIR registration cognizable offence refusal police station",
+                ]
+            )
+
+        if any(keyword in normalized for keyword in ("online payment", "payment fraud", "otp", "cyber fraud", "bank fraud")) or (
+            any(keyword in normalized for keyword in ("online", "payment", "otp", "bank", "cyber"))
+            and any(keyword in normalized for keyword in ("fraud", "cheating", "scam"))
+        ):
+            expanded.extend(
+                [
+                    "Information Technology Act section 66D cheating by personation using computer resource",
+                    "BNS section 318 cheating online payment fraud",
+                ]
+            )
+
+        if "punishment" in normalized and "cheating" in normalized and ("bns" in normalized or "bharatiya nyaya sanhita" in normalized):
+            expanded.extend(
+                [
+                    "BNS section 318(2) punishment for cheating",
+                    "BNS section 318(3) punishment for cheating wrongful loss",
+                    "BNS section 318(4) punishment for cheating delivery of property",
+                ]
+            )
+
+        if ("section 187" in normalized or re.search(r"\b187\b", normalized)) and ("bnss" in normalized or "bharatiya nagarik suraksha sanhita" in normalized):
+            expanded.append("BNSS section 187 detention magistrate police custody fifteen days ninety days")
+
+        deduped: list[str] = []
+        seen: set[str] = set()
+        for part in expanded:
+            candidate = re.sub(r"\s+", " ", part.strip())
+            if not candidate:
+                continue
+            key = candidate.lower()
+            if key in seen:
+                continue
+            seen.add(key)
+            deduped.append(candidate)
+        return deduped
+
     def _rerank_hits(self, query: str, hits: list[dict], top_k: int) -> list[dict]:
         normalized = query.lower()
         wants_bns = "bns" in normalized or "bharatiya nyaya sanhita" in normalized
         wants_bnss = "bnss" in normalized or "bharatiya nagarik suraksha sanhita" in normalized
         wants_ipc_compare = "ipc" in normalized or "compare" in normalized or "comparison" in normalized
+        wants_arrest_rights = "arrest" in normalized and any(keyword in normalized for keyword in ("right", "rights", "bail", "advocate", "lawyer"))
+        wants_fir_registration = "fir" in normalized and any(keyword in normalized for keyword in ("cognizable", "register", "registration", "refuse", "refusal"))
+        wants_online_payment_fraud = any(keyword in normalized for keyword in ("online payment", "payment fraud", "otp", "bank fraud", "cyber fraud")) or (
+            any(keyword in normalized for keyword in ("online", "payment", "otp", "bank", "cyber"))
+            and any(keyword in normalized for keyword in ("fraud", "cheating", "scam"))
+        )
+        wants_cheating_punishment = "punishment" in normalized and "cheating" in normalized
         wants_substantive_offence = (
             any(keyword in normalized for keyword in SUBSTANTIVE_OFFENCE_KEYWORDS)
             and "procedure" not in normalized
@@ -477,6 +553,36 @@ class Retriever:
                 adjusted += 0.04
             if item.get("reference_path"):
                 adjusted += 0.03
+            if wants_arrest_rights:
+                if self._citation_contains(item, "Act No. 46 of 2023 | Section 47") or "grounds of arrest" in haystack or "right to bail" in haystack:
+                    adjusted += 0.55
+                if self._citation_contains(item, "Act No. 46 of 2023 | Section 38") or "advocate of his choice" in haystack:
+                    adjusted += 0.45
+                if self._citation_contains(item, "Act No. 46 of 2023 | Section 478"):
+                    adjusted -= 0.05
+                if self._citation_contains(item, "Act No. 46 of 2023 | Section 187") or self._citation_contains(item, "Act No. 46 of 2023 | Section 83"):
+                    adjusted -= 0.16
+            if wants_fir_registration:
+                if self._citation_contains(item, "Act No. 46 of 2023 | Section 173") or "cognizable offence" in haystack:
+                    adjusted += 0.38
+                if "free of cost" in haystack or "copy of the information" in haystack:
+                    adjusted += 0.12
+                if self._citation_contains(item, "Act No. 46 of 2023 | Section 35") or self._citation_contains(item, "Act No. 46 of 2023 | Section 40"):
+                    adjusted -= 0.12
+            if wants_online_payment_fraud:
+                if self._citation_contains(item, "Act No. 21 of 2000 | Section 66D") or "computer resource" in haystack or "personation" in haystack:
+                    adjusted += 0.66
+                if self._citation_contains(item, "Act No. 45 of 2023 | Section 318"):
+                    adjusted += 0.2
+                if self._citation_contains(item, "Act No. 45 of 2023 | Section 321") or self._citation_contains(item, "Act No. 45 of 2023 | Section 245"):
+                    adjusted -= 0.28
+            if wants_cheating_punishment:
+                if self._citation_contains(item, "Act No. 45 of 2023 | Section 318(2)"):
+                    adjusted += 0.24
+                if self._citation_contains(item, "Act No. 45 of 2023 | Section 318(3)"):
+                    adjusted += 0.16
+                if self._citation_contains(item, "Act No. 45 of 2023 | Section 318(4)"):
+                    adjusted += 0.16
             if wants_substantive_offence:
                 if "bns" in haystack or "bharatiya nyaya sanhita" in haystack:
                     adjusted += 0.16
@@ -511,4 +617,25 @@ class Retriever:
                 merged.extend([row for row in reranked if id(row) not in seen_ids][: top_k - len(merged)])
             return merged[:top_k]
 
+        if wants_online_payment_fraud:
+            cyber_hits: list[dict] = []
+            primary: list[dict] = []
+            for item in reranked:
+                haystack = f"{item.get('title', '')} {item.get('citation', '')}".lower()
+                if "section 66d" in haystack or "information technology act" in haystack:
+                    cyber_hits.append(item)
+                else:
+                    primary.append(item)
+            merged: list[dict] = []
+            if cyber_hits:
+                merged.append(cyber_hits[0])
+            merged.extend(primary[: max(top_k - len(merged), 0)])
+            if len(merged) < top_k:
+                seen_ids = {id(row) for row in merged}
+                merged.extend([row for row in reranked if id(row) not in seen_ids][: top_k - len(merged)])
+            return merged[:top_k]
+
         return reranked[:top_k]
+
+    def _citation_contains(self, item: dict, needle: str) -> bool:
+        return needle.lower() in str(item.get("citation", "")).lower()

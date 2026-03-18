@@ -53,7 +53,7 @@ class LegalEngine:
         scope = self.retriever.assess_scope(contextual_question)
         if not scope["in_scope"]:
             return self._out_of_scope_response(scope)
-        prioritized_hits = self._filter_grounded_hits(self._prioritize_hits_for_question(contextual_question, scope["hits"]))
+        prioritized_hits = self._filter_grounded_hits(self._dedupe_hits(self._prioritize_hits_for_question(contextual_question, scope["hits"])))
         if not prioritized_hits:
             return self._insufficient_grounding_response()
         sources = self._build_source_documents(prioritized_hits)
@@ -300,7 +300,7 @@ class LegalEngine:
             SourceDocument(
                 title=item["title"],
                 citation=item["citation"],
-                excerpt=item["text"][:280],
+                excerpt=(item.get("summary") or item["text"])[:420],
                 source_type=item.get("source_type", "statute"),
                 score=round(item["score"], 4),
                 source_url=item.get("source_url") or self._default_source_url(item["citation"], item["title"]),
@@ -486,9 +486,9 @@ class LegalEngine:
         lead = sources[0]
         supporting = sources[1:3]
         citations = ", ".join(dict.fromkeys(source.citation for source in sources[:3]))
-        explanation = self._plain_language_summary(lead)
+        explanation = self._compose_question_specific_summary(question, sources)
         support_lines = [
-            f"- {source.reference_path or source.citation}: {self._plain_language_summary(source)}"
+            f"- {source.reference_path or source.citation}: {self._supporting_summary(question, source)}"
             for source in supporting
         ]
         next_steps = self._suggest_question_specific_steps(question, sources)
@@ -534,12 +534,124 @@ class LegalEngine:
             return ""
         return user_messages[-1][:220]
 
+    def _compose_question_specific_summary(self, question: str, sources: list[SourceDocument]) -> str:
+        normalized = question.lower()
+        if "arrest" in normalized and any(keyword in normalized for keyword in ("right", "rights", "bail", "advocate", "lawyer")):
+            return self._summarize_arrest_rights(sources)
+        if "fir" in normalized and any(keyword in normalized for keyword in ("cognizable", "register", "registration", "refuse", "refusal")):
+            return self._summarize_fir_registration(sources)
+        if ("section 187" in normalized or re.search(r"\b187\b", normalized)) and ("bnss" in normalized or "bharatiya nagarik suraksha sanhita" in normalized):
+            return self._summarize_bnss_section_187(sources)
+        if "punishment" in normalized and "cheating" in normalized:
+            return self._summarize_cheating_punishment(sources)
+        if any(keyword in normalized for keyword in ("online payment", "payment fraud", "otp", "bank fraud", "cyber fraud")) or (
+            any(keyword in normalized for keyword in ("online", "payment", "otp", "bank", "cyber"))
+            and any(keyword in normalized for keyword in ("fraud", "cheating", "scam"))
+        ):
+            return self._summarize_online_payment_fraud(sources)
+        return self._plain_language_summary(sources[0])
+
+    def _summarize_arrest_rights(self, sources: list[SourceDocument]) -> str:
+        details: list[str] = []
+        if self._find_source(sources, "grounds of arrest") or self._find_source(sources, "Section 47"):
+            details.append("you should be told the grounds of arrest")
+        if self._find_source(sources, "right to bail") or self._find_source(sources, "Section 478"):
+            details.append("in bailable cases, you should be informed about bail")
+        if self._find_source(sources, "advocate of his choice") or self._find_source(sources, "Section 38"):
+            details.append("you can meet an advocate of your choice during interrogation")
+        if not details:
+            return self._plain_language_summary(sources[0])
+        return "If you are arrested, " + self._join_human_list(details) + "."
+
+    def _summarize_fir_registration(self, sources: list[SourceDocument]) -> str:
+        if self._find_source(sources, "Section 173"):
+            return (
+                "For a cognizable offence, the police are expected to record the information and give the informant a free copy of what was recorded. "
+                "A limited preliminary enquiry may happen in some cases, but that is not the same as refusing the complaint altogether."
+            )
+        return self._plain_language_summary(sources[0])
+
+    def _summarize_bnss_section_187(self, sources: list[SourceDocument]) -> str:
+        excerpts = [self._normalized_excerpt(source).lower() for source in sources[:3]]
+        if any("magistrate" in excerpt for excerpt in excerpts) and any(
+            keyword in excerpt for excerpt in excerpts for keyword in ("detention", "custody", "fifteen days")
+        ):
+            return (
+                "Section 187 BNSS is about detention during investigation and the Magistrate's control over further custody. "
+                "In simple terms, the police cannot keep a person in custody indefinitely on their own, and the law sets judicial checks and time limits."
+            )
+        return self._plain_language_summary(sources[0])
+
+    def _summarize_cheating_punishment(self, sources: list[SourceDocument]) -> str:
+        available = {source.citation: self._normalized_excerpt(source) for source in sources[:4]}
+        if any("section 318(2)" in citation.lower() for citation in available):
+            return (
+                "Under BNS Section 318, simple cheating can lead to up to 3 years' imprisonment, fine, or both. "
+                "More serious forms can go up to 5 years or 7 years depending on the wrongful-loss or property-delivery facts."
+            )
+        return self._plain_language_summary(sources[0])
+
+    def _summarize_online_payment_fraud(self, sources: list[SourceDocument]) -> str:
+        if self._find_source(sources, "Section 66D") or self._find_source(sources, "computer resource"):
+            return (
+                "Online payment fraud can overlap with cyber-cheating and cheating provisions. "
+                "The immediate priorities are to secure the bank or payment account, preserve the transaction trail, and report the matter quickly."
+            )
+        return (
+            "After an online payment fraud, act quickly to secure the account, preserve transaction records, and report the incident. "
+            "The legal position depends on the exact cheating or cyber-fraud facts shown by the evidence."
+        )
+
+    def _supporting_summary(self, question: str, source: SourceDocument) -> str:
+        normalized = question.lower()
+        excerpt = self._normalized_excerpt(source)
+        if "punishment" in normalized and "cheating" in normalized and "shall be punished" in excerpt:
+            return self._convert_punishment_excerpt(excerpt)
+        if "section 187" in normalized and "detention" in excerpt:
+            return "This part of Section 187 explains the Magistrate's role in approving further detention and setting custody limits."
+        if any(keyword in normalized for keyword in ("arrest", "rights", "bail", "advocate")):
+            if "grounds of arrest" in excerpt:
+                return "This source says the arrested person should be told the grounds of arrest."
+            if "right to bail" in excerpt or "released on bail" in excerpt:
+                return "This source covers the right to bail in bailable cases."
+            if "advocate of his choice" in excerpt:
+                return "This source says the arrested person can meet an advocate of choice during interrogation."
+        if "cognizable offence" in excerpt and "copy" in excerpt:
+            return "This source says the informant or victim should get a free copy of the recorded information."
+        return self._plain_language_summary(source)
+
     def _plain_language_summary(self, source: SourceDocument) -> str:
-        excerpt = re.sub(r"\s+", " ", source.excerpt).strip()
+        excerpt = self._normalized_excerpt(source)
+        heading_match = re.match(r"^\d+[A-Za-z()/-]*\.\s*([^.-]{4,140})\s*[.-]+\s*(.+)$", excerpt)
+        if heading_match:
+            heading = heading_match.group(1).strip(" .")
+            body = heading_match.group(2).strip()
+            if "shall be punished" in body:
+                return f"{heading} - {self._convert_punishment_excerpt(body)}"
+            sentence = re.split(r"(?<=[.!?])\s+", body)[0].strip()
+            if sentence:
+                return f"{heading} means {sentence[:220]}"
+        if excerpt.startswith("(") and "shall be punished" in excerpt:
+            return self._convert_punishment_excerpt(excerpt)
+        if excerpt.startswith("(") and "shall be entitled to" in excerpt:
+            sentence = re.split(r"(?<=[.!?])\s+", excerpt)[0].strip()
+            return sentence.replace("shall be entitled to", "is entitled to")
         sentence = re.split(r"(?<=[.!?])\s+", excerpt)[0].strip()
         if sentence:
-            return sentence
+            return sentence[:220]
         return excerpt[:220]
+
+    def _convert_punishment_excerpt(self, excerpt: str) -> str:
+        cleaned = re.sub(r"^\([0-9A-Za-z]+\)\s*", "", excerpt).strip()
+        cleaned = cleaned.replace("Whoever", "").strip(" .")
+        term_match = re.search(r"term which may extend to ([a-z0-9 -]+?years?)", cleaned, flags=re.IGNORECASE)
+        fine = "fine" in cleaned.lower()
+        if term_match:
+            term = term_match.group(1).strip()
+            if fine:
+                return f"This provision allows imprisonment for up to {term}, along with fine."
+            return f"This provision allows imprisonment for up to {term}."
+        return cleaned[:220]
 
     def _grounding_fragments(self, source: SourceDocument) -> list[str]:
         fragments: list[str] = []
@@ -592,6 +704,50 @@ class LegalEngine:
             f"The strongest grounded authority retrieved for this question is {lead.citation}. "
             "Review that source carefully and have a qualified lawyer check how it applies to your facts."
         )
+
+    def _normalized_excerpt(self, source: SourceDocument) -> str:
+        replacements = {
+            "\u2014": " - ",
+            "\u2013": " - ",
+            "\u2018": "'",
+            "\u2019": "'",
+            "\u201c": '"',
+            "\u201d": '"',
+            "\u00a0": " ",
+        }
+        cleaned = source.excerpt
+        for old, new in replacements.items():
+            cleaned = cleaned.replace(old, new)
+        return re.sub(r"\s+", " ", cleaned).strip()
+
+    def _find_source(self, sources: list[SourceDocument], needle: str) -> SourceDocument | None:
+        lowered = needle.lower()
+        for source in sources:
+            haystack = f"{source.citation} {source.reference_path or ''} {source.excerpt}".lower()
+            if lowered in haystack:
+                return source
+        return None
+
+    def _dedupe_hits(self, hits: list[dict]) -> list[dict]:
+        seen: set[str] = set()
+        deduped: list[dict] = []
+        for item in hits:
+            key = str(item.get("citation") or item.get("reference_path") or item.get("title"))
+            if key in seen:
+                continue
+            seen.add(key)
+            deduped.append(item)
+        return deduped
+
+    def _join_human_list(self, parts: list[str]) -> str:
+        unique_parts = list(dict.fromkeys(part.strip() for part in parts if part.strip()))
+        if not unique_parts:
+            return ""
+        if len(unique_parts) == 1:
+            return unique_parts[0]
+        if len(unique_parts) == 2:
+            return f"{unique_parts[0]} and {unique_parts[1]}"
+        return ", ".join(unique_parts[:-1]) + f", and {unique_parts[-1]}"
 
     def _fallback_reasoning(self, sources: list[SourceDocument]) -> str:
         return "The incident pattern overlaps with the retrieved provisions, subject to factual verification and procedural requirements."
