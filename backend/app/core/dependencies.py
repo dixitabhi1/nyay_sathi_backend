@@ -20,6 +20,7 @@ from app.services.legal_section_classifier import LegalSectionClassifier
 from app.services.lawyers import LawyerNetworkService
 from app.services.legal_engine import LegalEngine
 from app.services.messaging import MessagingService
+from app.services.page_index import PageIndexStore
 from app.services.retriever import Retriever
 from app.services.vector_store import FaissVectorStore
 
@@ -35,8 +36,13 @@ def get_vector_store() -> FaissVectorStore:
 
 
 @lru_cache
+def get_page_index_store() -> PageIndexStore:
+    return PageIndexStore(get_settings())
+
+
+@lru_cache
 def get_retriever() -> Retriever:
-    retriever = Retriever(get_settings(), get_embedding_service(), get_vector_store())
+    retriever = Retriever(get_settings(), get_embedding_service(), get_vector_store(), get_page_index_store())
     retriever.ensure_index()
     return retriever
 

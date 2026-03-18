@@ -13,6 +13,9 @@ class SourceDocument(BaseModel):
     source_type: str
     score: float
     source_url: str | None = None
+    reference_path: str | None = None
+    retrieval_mode: str | None = None
+    confidence: float | None = None
 
 
 class ChatRequest(BaseModel):

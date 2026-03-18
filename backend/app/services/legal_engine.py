@@ -56,17 +56,7 @@ class LegalEngine:
         prioritized_hits = self._filter_grounded_hits(self._prioritize_hits_for_question(contextual_question, scope["hits"]))
         if not prioritized_hits:
             return self._insufficient_grounding_response()
-        sources = [
-            SourceDocument(
-                title=item["title"],
-                citation=item["citation"],
-                excerpt=item["text"][:280],
-                source_type=item.get("source_type", "statute"),
-                score=round(item["score"], 4),
-                source_url=item.get("source_url") or self._default_source_url(item["citation"], item["title"]),
-            )
-            for item in prioritized_hits
-        ]
+        sources = self._build_source_documents(prioritized_hits)
         if not self._has_grounded_sources(sources):
             return self._insufficient_grounding_response()
         context = self._format_sources_for_prompt(sources)
@@ -252,7 +242,7 @@ class LegalEngine:
 
     def research(self, payload: ResearchRequest) -> ResearchResponse:
         hits = self._retrieve_sources(payload.query, payload.top_k)
-        summary = "Relevant statutes and precedents retrieved for the research query."
+        summary = "Hybrid retrieval combined semantic RAG hits with PageIndex section navigation for this legal research query."
         return ResearchResponse(summary=summary, hits=hits)
 
     async def analyze_contract(
@@ -303,6 +293,9 @@ class LegalEngine:
 
     def _retrieve_sources(self, query: str, top_k: int | None = None) -> list[SourceDocument]:
         results = self.retriever.search(query, top_k)
+        return self._build_source_documents(results)
+
+    def _build_source_documents(self, hits: list[dict]) -> list[SourceDocument]:
         return [
             SourceDocument(
                 title=item["title"],
@@ -311,8 +304,11 @@ class LegalEngine:
                 source_type=item.get("source_type", "statute"),
                 score=round(item["score"], 4),
                 source_url=item.get("source_url") or self._default_source_url(item["citation"], item["title"]),
+                reference_path=item.get("reference_path"),
+                retrieval_mode=item.get("retrieval_mode"),
+                confidence=round(float(item.get("confidence", item.get("score", 0.0))), 4) if item.get("score") is not None else None,
             )
-            for item in results
+            for item in hits
         ]
 
     def _format_sources_for_prompt(self, sources: list[SourceDocument]) -> str:
@@ -323,7 +319,10 @@ class LegalEngine:
                     [
                         f"[Source {index}] {source.title}",
                         f"Citation: {source.citation}",
+                        f"Reference path: {source.reference_path or source.citation}",
                         f"Type: {source.source_type}",
+                        f"Retrieval mode: {source.retrieval_mode or 'semantic'}",
+                        f"Confidence: {source.confidence if source.confidence is not None else source.score}",
                         f"Excerpt: {source.excerpt}",
                         f"URL: {source.source_url or 'Unavailable'}",
                     ]
@@ -410,83 +409,38 @@ class LegalEngine:
         normalized = question.lower().strip()
         if not re.search(r"\bhow many\b.*\bsections?\b|\bnumber of sections?\b", normalized):
             return None
-
-        if "bnss" in normalized or "bharatiya nagarik suraksha sanhita" in normalized:
-            source = SourceDocument(
-                title="Bharatiya Nagarik Suraksha Sanhita, 2023",
-                citation="India Code Act No. 46 of 2023",
-                excerpt=(
-                    "In the official India Code text of the Bharatiya Nagarik Suraksha Sanhita, 2023, "
-                    "the statute runs from section 1 to section 531."
-                ),
-                source_type="statute",
-                score=1.0,
-                source_url="https://www.indiacode.nic.in/handle/123456789/21544",
-            )
-            return ChatResponse(
-                answer=(
-                    "The Bharatiya Nagarik Suraksha Sanhita, 2023 contains 531 sections. "
-                    "This is based on the official India Code text, where the statute runs from section 1 to section 531."
-                ),
-                reasoning=(
-                    "This answer is taken from the statute structure itself rather than semantic retrieval. "
-                    "For structural questions, NyayaSetu should use the official act text directly."
-                ),
-                sources=[source],
-                in_scope=True,
-            )
-
-        if re.search(r"\bbns\b", normalized) or "bharatiya nyaya sanhita" in normalized:
-            source = SourceDocument(
-                title="Bharatiya Nyaya Sanhita, 2023",
-                citation="India Code Act No. 45 of 2023",
-                excerpt=(
-                    "In the India Code text of the Bharatiya Nyaya Sanhita, 2023, the Arrangement of Sections runs "
-                    "from section 1 to section 358."
-                ),
-                source_type="statute",
-                score=1.0,
-                source_url="https://www.indiacode.nic.in/handle/123456789/20062",
-            )
-            return ChatResponse(
-                answer=(
-                    "The Bharatiya Nyaya Sanhita, 2023 contains 358 sections. This is based on the official India Code text, "
-                    "where the arrangement of sections runs from section 1 to section 358."
-                ),
-                reasoning=(
-                    "This answer is taken from the statute structure itself rather than from a penal-section mapping. "
-                    "For structural questions like this, NyayaSetu should use the official act text instead of retrieving unrelated offence provisions."
-                ),
-                sources=[source],
-                in_scope=True,
-            )
-
-        if re.search(r"\bbsa\b", normalized) or "bharatiya sakshya adhiniyam" in normalized:
-            source = SourceDocument(
-                title="Bharatiya Sakshya Adhiniyam, 2023",
-                citation="India Code Act No. 47 of 2023",
-                excerpt=(
-                    "In the official India Code text of the Bharatiya Sakshya Adhiniyam, 2023, "
-                    "the statute runs from section 1 to section 170."
-                ),
-                source_type="statute",
-                score=1.0,
-                source_url="https://www.indiacode.nic.in/handle/123456789/20063",
-            )
-            return ChatResponse(
-                answer=(
-                    "The Bharatiya Sakshya Adhiniyam, 2023 contains 170 sections. "
-                    "This is based on the official India Code text, where the statute runs from section 1 to section 170."
-                ),
-                reasoning=(
-                    "This answer is taken from the statute structure itself rather than semantic retrieval. "
-                    "For structural questions, NyayaSetu should use the official act text directly."
-                ),
-                sources=[source],
-                in_scope=True,
-            )
-
-        return None
+        overview = self.retriever.get_structure_overview(question)
+        if not overview:
+            return None
+        title = overview["title"]
+        section_count = overview["section_count"]
+        chapter_count = overview["chapter_count"]
+        source = SourceDocument(
+            title=title,
+            citation=f"PageIndex structural overview for {title}",
+            excerpt=(
+                f"The PageIndex hierarchy for {title} currently tracks {section_count} sections "
+                f"across {chapter_count} chapter buckets."
+            ),
+            source_type="statute",
+            score=1.0,
+            source_url=self._default_source_url(title, title),
+            reference_path=title,
+            retrieval_mode="page_index",
+            confidence=1.0,
+        )
+        return ChatResponse(
+            answer=(
+                f"{title} currently has {section_count} indexed sections in NyayaSetu's PageIndex. "
+                f"The structural index groups them across {chapter_count} chapter buckets so the assistant can navigate the Act logically."
+            ),
+            reasoning=(
+                "This answer came from the PageIndex document structure rather than semantic similarity. "
+                "NyayaSetu uses the act hierarchy directly for structural questions so the reply stays section-grounded and explainable."
+            ),
+            sources=[source],
+            in_scope=True,
+        )
 
     def _prioritize_hits_for_question(self, question: str, hits: list[dict]) -> list[dict]:
         normalized = question.lower()
@@ -534,24 +488,26 @@ class LegalEngine:
         citations = ", ".join(dict.fromkeys(source.citation for source in sources[:3]))
         explanation = self._plain_language_summary(lead)
         support_lines = [
-            f"- {source.citation}: {self._plain_language_summary(source)}"
+            f"- {source.reference_path or source.citation}: {self._plain_language_summary(source)}"
             for source in supporting
         ]
         next_steps = self._suggest_question_specific_steps(question, sources)
+        retrieval_modes = ", ".join(sorted(dict.fromkeys(source.retrieval_mode or "semantic" for source in sources[:3])))
         answer_parts = [
             f"Short answer: {explanation}",
             f"Most relevant authority: {lead.citation}.",
         ]
         if recent_context:
             answer_parts.append(f"Conversation context used: {recent_context}")
+        answer_parts.append("Structured reference path:\n" + "\n".join(f"- {source.reference_path or source.citation}" for source in sources[:3]))
         if support_lines:
             answer_parts.append("Supporting material:\n" + "\n".join(support_lines))
         if next_steps:
             answer_parts.append("Practical next steps:\n" + "\n".join(f"- {step}" for step in next_steps))
         answer_parts.append(f"Grounded citations: {citations}.")
         reasoning = (
-            "NyayaSetu is in retrieval-first mode, so this answer was composed from the top grounded legal sources. "
-            f"It prioritized {citations} and converted the retrieved excerpts into plain-language guidance."
+            "NyayaSetu used hybrid retrieval for this answer. "
+            f"It fused {retrieval_modes} evidence, prioritized {citations}, and converted the retrieved excerpts into plain-language guidance."
         )
         return {"answer": "\n\n".join(answer_parts), "reasoning": reasoning}
 

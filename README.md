@@ -12,19 +12,26 @@ pinned: false
 
 NyayaSetu is a self-hosted legal intelligence platform for Indian law. The stack uses open-source models, FAISS retrieval, SQLite or Turso/libSQL for application state, DuckDB for corpus analytics, and manifest-driven ingestion from official legal sources.
 
+Hybrid retrieval note:
+
+- NyayaSetu now uses semantic RAG plus a structure-aware PageIndex layer for act, chapter, section, and clause navigation.
+- Architecture details are documented in `docs/NyayaSetu_Hybrid_Retrieval_Architecture.md`.
+
 ## Architecture
 
 ```mermaid
 flowchart TD
     A[Fine-tuned LLM]
-    B[RAG Layer]
-    C[FAISS + DuckDB Corpus Store]
+    B[Hybrid Retriever]
+    C[FAISS Semantic Index]
+    F[PageIndex Structure Store]
     D[FastAPI Backend]
     E[React Interface]
 
     E --> D
     D --> B
     B --> C
+    B --> F
     B --> A
     A --> D
     D --> E
@@ -156,7 +163,8 @@ Pipeline:
 1. `python ingestion/scripts/fetch_official_sources.py`
 2. `python ingestion/scripts/build_legal_corpus.py`
 3. `python rag/indexing/build_faiss_index.py`
-4. `python ingestion/scripts/corpus_stats.py`
+4. `python rag/indexing/build_page_index.py`
+5. `python ingestion/scripts/corpus_stats.py`
 
 ## Corpus Processing Features
 

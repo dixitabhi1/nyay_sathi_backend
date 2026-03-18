@@ -93,7 +93,7 @@ class MessagingService:
     def list_conversations(self, current_user: User) -> ConversationListResponse:
         session = SessionLocal()
         try:
-            rows = (
+            conversations = (
                 session.query(DirectConversation)
                 .filter(
                     or_(
@@ -107,8 +107,28 @@ class MessagingService:
                 )
                 .all()
             )
+            user_ids = {
+                participant_id
+                for conversation in conversations
+                for participant_id in (conversation.participant_a_id, conversation.participant_b_id)
+            }
+            users_by_id, profiles_by_user_id = self._load_users_and_profiles(session, user_ids)
+            unread_counts = self._conversation_unread_counts(
+                session,
+                [conversation.id for conversation in conversations],
+                current_user.id,
+            )
             return ConversationListResponse(
-                conversations=[self._serialize_conversation_summary(session, row, current_user.id) for row in rows]
+                conversations=[
+                    self._serialize_conversation_summary_from_maps(
+                        conversation,
+                        current_user_id=current_user.id,
+                        users_by_id=users_by_id,
+                        profiles_by_user_id=profiles_by_user_id,
+                        unread_count=unread_counts.get(conversation.id, 0),
+                    )
+                    for conversation in conversations
+                ]
             )
         finally:
             session.close()
@@ -117,32 +137,11 @@ class MessagingService:
         session = SessionLocal()
         try:
             conversation = self._require_conversation(session, conversation_id, current_user.id)
-            now = datetime.utcnow()
-            unread_messages = (
-                session.query(DirectMessage)
-                .filter(
-                    DirectMessage.conversation_id == conversation.id,
-                    DirectMessage.recipient_user_id == current_user.id,
-                    DirectMessage.read_at.is_(None),
-                )
-                .all()
-            )
-            for message in unread_messages:
-                message.read_at = now
-                session.add(message)
-            if unread_messages:
-                session.commit()
-
-            messages = (
-                session.query(DirectMessage)
-                .filter(DirectMessage.conversation_id == conversation.id)
-                .order_by(DirectMessage.created_at.asc(), DirectMessage.id.asc())
-                .limit(200)
-                .all()
-            )
-            return ConversationDetailResponse(
-                conversation=self._serialize_conversation_summary(session, conversation, current_user.id),
-                messages=[self._serialize_message(session, row, current_user.id) for row in messages],
+            return self._build_conversation_detail(
+                session,
+                conversation,
+                current_user_id=current_user.id,
+                mark_as_read=True,
             )
         finally:
             session.close()
@@ -171,9 +170,11 @@ class MessagingService:
                 session.add(conversation)
                 session.commit()
                 session.refresh(conversation)
-            return ConversationDetailResponse(
-                conversation=self._serialize_conversation_summary(session, conversation, current_user.id),
-                messages=[],
+            return self._build_conversation_detail(
+                session,
+                conversation,
+                current_user_id=current_user.id,
+                mark_as_read=True,
             )
         finally:
             session.close()
@@ -230,9 +231,77 @@ class MessagingService:
             session.add(conversation)
             session.commit()
             session.refresh(message)
-            return self._serialize_message(session, message, current_user.id)
+
+            users_by_id, profiles_by_user_id = self._load_users_and_profiles(
+                session,
+                {current_user.id, recipient_id},
+            )
+            return self._serialize_message_from_maps(
+                message,
+                current_user_id=current_user.id,
+                users_by_id=users_by_id,
+                profiles_by_user_id=profiles_by_user_id,
+            )
         finally:
             session.close()
+
+    def _build_conversation_detail(
+        self,
+        session,
+        conversation: DirectConversation,
+        current_user_id: str,
+        mark_as_read: bool,
+    ) -> ConversationDetailResponse:
+        if mark_as_read:
+            now = datetime.utcnow()
+            unread_messages = (
+                session.query(DirectMessage)
+                .filter(
+                    DirectMessage.conversation_id == conversation.id,
+                    DirectMessage.recipient_user_id == current_user_id,
+                    DirectMessage.read_at.is_(None),
+                )
+                .all()
+            )
+            for message in unread_messages:
+                message.read_at = now
+                session.add(message)
+            if unread_messages:
+                session.commit()
+
+        messages = (
+            session.query(DirectMessage)
+            .filter(DirectMessage.conversation_id == conversation.id)
+            .order_by(DirectMessage.created_at.asc(), DirectMessage.id.asc())
+            .limit(200)
+            .all()
+        )
+        user_ids = {
+            participant_id
+            for participant_id in (conversation.participant_a_id, conversation.participant_b_id)
+        }
+        user_ids.update(message.sender_user_id for message in messages)
+        user_ids.update(message.recipient_user_id for message in messages)
+        users_by_id, profiles_by_user_id = self._load_users_and_profiles(session, user_ids)
+        unread_counts = self._conversation_unread_counts(session, [conversation.id], current_user_id)
+        return ConversationDetailResponse(
+            conversation=self._serialize_conversation_summary_from_maps(
+                conversation,
+                current_user_id=current_user_id,
+                users_by_id=users_by_id,
+                profiles_by_user_id=profiles_by_user_id,
+                unread_count=unread_counts.get(conversation.id, 0),
+            ),
+            messages=[
+                self._serialize_message_from_maps(
+                    message,
+                    current_user_id=current_user_id,
+                    users_by_id=users_by_id,
+                    profiles_by_user_id=profiles_by_user_id,
+                )
+                for message in messages
+            ],
+        )
 
     def _serialize_participant(
         self,
@@ -248,61 +317,85 @@ class MessagingService:
             lawyer_verified=bool(lawyer_profile.verified) if lawyer_profile else False,
         )
 
-    def _serialize_message(
+    def _serialize_message_from_maps(
         self,
-        session,
         message: DirectMessage,
         current_user_id: str,
+        users_by_id: dict[str, User],
+        profiles_by_user_id: dict[str, LawyerProfile],
     ) -> DirectMessageResponse:
-        sender = session.get(User, message.sender_user_id)
-        recipient = session.get(User, message.recipient_user_id)
+        sender = users_by_id.get(message.sender_user_id)
+        recipient = users_by_id.get(message.recipient_user_id)
         if not sender or not recipient:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Message participant not found.")
-        sender_profile = session.query(LawyerProfile).filter(LawyerProfile.user_id == sender.id).first()
-        recipient_profile = session.query(LawyerProfile).filter(LawyerProfile.user_id == recipient.id).first()
         return DirectMessageResponse(
             id=message.id,
             conversation_id=message.conversation_id,
-            sender=self._serialize_participant(sender, sender_profile),
-            recipient=self._serialize_participant(recipient, recipient_profile),
+            sender=self._serialize_participant(sender, profiles_by_user_id.get(sender.id)),
+            recipient=self._serialize_participant(recipient, profiles_by_user_id.get(recipient.id)),
             content=message.content,
             created_at=message.created_at.isoformat(),
             read_at=message.read_at.isoformat() if message.read_at else None,
             is_mine=message.sender_user_id == current_user_id,
         )
 
-    def _serialize_conversation_summary(
+    def _serialize_conversation_summary_from_maps(
         self,
-        session,
         conversation: DirectConversation,
         current_user_id: str,
+        users_by_id: dict[str, User],
+        profiles_by_user_id: dict[str, LawyerProfile],
+        unread_count: int,
     ) -> ConversationSummaryResponse:
         counterpart_id = (
             conversation.participant_b_id
             if conversation.participant_a_id == current_user_id
             else conversation.participant_a_id
         )
-        counterpart = session.get(User, counterpart_id)
+        counterpart = users_by_id.get(counterpart_id)
         if not counterpart:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Conversation participant not found.")
-        counterpart_profile = session.query(LawyerProfile).filter(LawyerProfile.user_id == counterpart.id).first()
-        unread_count = (
-            session.query(func.count(DirectMessage.id))
-            .filter(
-                DirectMessage.conversation_id == conversation.id,
-                DirectMessage.recipient_user_id == current_user_id,
-                DirectMessage.read_at.is_(None),
-            )
-            .scalar()
-            or 0
-        )
         return ConversationSummaryResponse(
             id=conversation.id,
-            counterpart=self._serialize_participant(counterpart, counterpart_profile),
+            counterpart=self._serialize_participant(counterpart, profiles_by_user_id.get(counterpart.id)),
             last_message_preview=conversation.last_message_preview,
             last_message_at=conversation.last_message_at.isoformat() if conversation.last_message_at else None,
-            unread_count=int(unread_count),
+            unread_count=unread_count,
         )
+
+    def _load_users_and_profiles(
+        self,
+        session,
+        user_ids: set[str],
+    ) -> tuple[dict[str, User], dict[str, LawyerProfile]]:
+        if not user_ids:
+            return {}, {}
+        users = session.query(User).filter(User.id.in_(sorted(user_ids))).all()
+        profiles = session.query(LawyerProfile).filter(LawyerProfile.user_id.in_(sorted(user_ids))).all()
+        return (
+            {user.id: user for user in users},
+            {profile.user_id: profile for profile in profiles if profile.user_id},
+        )
+
+    def _conversation_unread_counts(
+        self,
+        session,
+        conversation_ids: list[int],
+        user_id: str,
+    ) -> dict[int, int]:
+        if not conversation_ids:
+            return {}
+        rows = (
+            session.query(DirectMessage.conversation_id, func.count(DirectMessage.id))
+            .filter(
+                DirectMessage.conversation_id.in_(conversation_ids),
+                DirectMessage.recipient_user_id == user_id,
+                DirectMessage.read_at.is_(None),
+            )
+            .group_by(DirectMessage.conversation_id)
+            .all()
+        )
+        return {int(conversation_id): int(count) for conversation_id, count in rows}
 
     def _require_participant(
         self,

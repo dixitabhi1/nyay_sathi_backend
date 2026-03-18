@@ -77,6 +77,7 @@ class Settings(BaseSettings):
     )
     vector_index_path: Path = Field(default=Path("data/index/legal.index"), alias="VECTOR_INDEX_PATH")
     vector_metadata_path: Path = Field(default=Path("data/index/legal_metadata.json"), alias="VECTOR_METADATA_PATH")
+    page_index_path: Path = Field(default=Path("data/index/legal_page_index.json"), alias="PAGE_INDEX_PATH")
     legal_corpus_path: Path = Field(
         default=ROOT_DIR / "data" / "corpus" / "official_legal_corpus.jsonl",
         alias="LEGAL_CORPUS_PATH",
@@ -94,9 +95,15 @@ class Settings(BaseSettings):
         alias="JURISDICTION_GAZETTEER_PATH",
     )
     top_k_retrieval: int = Field(default=4, alias="TOP_K_RETRIEVAL")
+    page_index_top_k: int = Field(default=6, alias="PAGE_INDEX_TOP_K")
     legal_scope_anchor_threshold: float = Field(default=0.34, alias="LEGAL_SCOPE_ANCHOR_THRESHOLD")
     legal_scope_margin: float = Field(default=0.03, alias="LEGAL_SCOPE_MARGIN")
     legal_scope_corpus_threshold: float = Field(default=0.43, alias="LEGAL_SCOPE_CORPUS_THRESHOLD")
+    page_index_scope_threshold: float = Field(default=0.48, alias="PAGE_INDEX_SCOPE_THRESHOLD")
+    hybrid_semantic_weight: float = Field(default=0.55, alias="HYBRID_SEMANTIC_WEIGHT")
+    hybrid_page_index_weight: float = Field(default=0.35, alias="HYBRID_PAGE_INDEX_WEIGHT")
+    hybrid_cross_signal_bonus: float = Field(default=0.08, alias="HYBRID_CROSS_SIGNAL_BONUS")
+    hybrid_exact_reference_bonus: float = Field(default=0.12, alias="HYBRID_EXACT_REFERENCE_BONUS")
 
     inference_provider: str = Field(default="mock", alias="INFERENCE_PROVIDER")
     inference_base_url: str = Field(default="http://localhost:8000/v1", alias="INFERENCE_BASE_URL")
@@ -152,6 +159,8 @@ def get_settings() -> Settings:
     settings.analytics_db_path.parent.mkdir(parents=True, exist_ok=True)
     settings.vector_index_path.parent.mkdir(parents=True, exist_ok=True)
     settings.vector_metadata_path.parent.mkdir(parents=True, exist_ok=True)
+    settings.page_index_path = resolve_storage_path(settings.page_index_path, settings.persistent_storage_root)
+    settings.page_index_path.parent.mkdir(parents=True, exist_ok=True)
     settings.legal_corpus_path.parent.mkdir(parents=True, exist_ok=True)
     settings.upload_dir.mkdir(parents=True, exist_ok=True)
     return settings

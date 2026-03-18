@@ -42,6 +42,7 @@ from app.services.fir_service import FIRService
 class LawyerNetworkService:
     def __init__(self, fir_service: FIRService) -> None:
         self.fir_service = fir_service
+        self._seed_checked = False
 
     def list_lawyers(
         self,
@@ -409,6 +410,7 @@ class LawyerNetworkService:
                 .limit(5)
                 .all()
             )
+            dashboard_conversations = self._load_dashboard_conversations(session, current_user.id, limit=50)
             metrics = [
                 LawyerDashboardMetricResponse(
                     title="Followers",
@@ -435,7 +437,7 @@ class LawyerNetworkService:
                 ),
                 LawyerDashboardMetricResponse(
                     title="Active Conversations",
-                    value=str(len(self._load_dashboard_conversations(session, current_user.id, limit=50))),
+                    value=str(len(dashboard_conversations)),
                     detail="Direct citizen and professional chats currently linked to your account.",
                 ),
             ]
@@ -443,7 +445,7 @@ class LawyerNetworkService:
                 metrics=metrics,
                 recent_followers=recent_followers,
                 top_posts=[self._serialize_post(session, post, profile, is_liked=False) for post in feed_posts],
-                recent_conversations=self._load_dashboard_conversations(session, current_user.id, limit=6),
+                recent_conversations=dashboard_conversations[:6],
                 generated_at=datetime.utcnow(),
             )
         finally:
@@ -583,9 +585,6 @@ class LawyerNetworkService:
         profile: LawyerProfile,
         is_liked: bool = False,
     ) -> LawyerNetworkPostResponse:
-        post.like_count = self._post_like_count(session, post.id)
-        session.add(post)
-        session.flush()
         return LawyerNetworkPostResponse(
             id=post.id,
             handle=profile.handle,
@@ -720,37 +719,50 @@ class LawyerNetworkService:
             .limit(limit)
             .all()
         )
-        items: list[LawyerDashboardConversationResponse] = []
-        for row in rows:
-            counterpart_id = row.participant_b_id if row.participant_a_id == user_id else row.participant_a_id
-            counterpart = session.get(User, counterpart_id)
-            if not counterpart:
-                continue
-            unread_count = (
-                session.query(func.count(DirectMessage.id))
+        conversation_ids = [row.id for row in rows]
+        counterpart_ids = [
+            row.participant_b_id if row.participant_a_id == user_id else row.participant_a_id
+            for row in rows
+        ]
+        counterparts = session.query(User).filter(User.id.in_(counterpart_ids)).all() if counterpart_ids else []
+        counterparts_by_id = {counterpart.id: counterpart for counterpart in counterparts}
+        unread_counts: dict[int, int] = {}
+        if conversation_ids:
+            unread_rows = (
+                session.query(DirectMessage.conversation_id, func.count(DirectMessage.id))
                 .filter(
-                    DirectMessage.conversation_id == row.id,
+                    DirectMessage.conversation_id.in_(conversation_ids),
                     DirectMessage.recipient_user_id == user_id,
                     DirectMessage.read_at.is_(None),
                 )
-                .scalar()
-                or 0
+                .group_by(DirectMessage.conversation_id)
+                .all()
             )
+            unread_counts = {int(conversation_id): int(count) for conversation_id, count in unread_rows}
+        items: list[LawyerDashboardConversationResponse] = []
+        for row in rows:
+            counterpart_id = row.participant_b_id if row.participant_a_id == user_id else row.participant_a_id
+            counterpart = counterparts_by_id.get(counterpart_id)
+            if not counterpart:
+                continue
             items.append(
                 LawyerDashboardConversationResponse(
                     conversation_id=row.id,
                     counterpart_name=counterpart.full_name,
                     counterpart_role=counterpart.role,
                     preview=row.last_message_preview or "Conversation started",
-                    unread_count=int(unread_count),
+                    unread_count=unread_counts.get(row.id, 0),
                     last_message_at=row.last_message_at.isoformat() if row.last_message_at else None,
                 )
             )
         return items
 
     def _ensure_seed_data(self, session) -> None:
+        if self._seed_checked:
+            return
         existing = session.query(LawyerProfile.id).limit(1).first()
         if existing:
+            self._seed_checked = True
             return
 
         now = datetime.utcnow()
@@ -1050,6 +1062,7 @@ class LawyerNetworkService:
                     session.add(post)
 
         session.commit()
+        self._seed_checked = True
 
     def _normalize_handle(self, handle: str) -> str:
         normalized = handle.strip().lower()

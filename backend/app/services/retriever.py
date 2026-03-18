@@ -6,6 +6,7 @@ import re
 
 from app.core.config import Settings
 from app.services.embeddings import EmbeddingService, build_embedding_text
+from app.services.page_index import PageIndexStore
 from app.services.vector_store import FaissVectorStore
 
 EXPLICIT_NON_LEGAL_PATTERNS = [
@@ -65,13 +66,20 @@ SUBSTANTIVE_OFFENCE_KEYWORDS = (
 
 
 class Retriever:
-    def __init__(self, settings: Settings, embeddings: EmbeddingService, vector_store: FaissVectorStore) -> None:
+    def __init__(
+        self,
+        settings: Settings,
+        embeddings: EmbeddingService,
+        vector_store: FaissVectorStore,
+        page_index: PageIndexStore,
+    ) -> None:
         self.settings = settings
         self.embeddings = embeddings
         self.vector_store = vector_store
+        self.page_index = page_index
 
     def ensure_index(self) -> None:
-        if self.vector_store.exists():
+        if self.vector_store.exists() and self.page_index.exists():
             self._warmup_embeddings()
             return
 
@@ -83,20 +91,21 @@ class Retriever:
             for line in corpus_path.read_text(encoding="utf-8").splitlines()
             if line.strip()
         ]
-        embeddings = self.embeddings.encode(build_embedding_text(doc) for doc in documents)
-        self.vector_store.build(embeddings, documents)
+        if not self.vector_store.exists():
+            embeddings = self.embeddings.encode(build_embedding_text(doc) for doc in documents)
+            self.vector_store.build(embeddings, documents)
+        if not self.page_index.exists():
+            self.page_index.build(documents)
         self._warmup_embeddings()
 
     def search(self, query: str, top_k: int | None = None) -> list[dict]:
         requested_top_k = top_k or self.settings.top_k_retrieval
-        exact_hits = self.lookup_exact_reference(query, requested_top_k)
-        if exact_hits:
-            return exact_hits
-
-        query_vector = self.embeddings.encode_query(query)
-        candidate_top_k = max(requested_top_k * 4, 12)
-        raw_hits = self.search_by_vector(query_vector, candidate_top_k)
-        return self._rerank_hits(query, raw_hits, requested_top_k)
+        query_parts = self._decompose_query(query)
+        semantic_hits = self._search_semantic_queries(query_parts, requested_top_k)
+        structural_hits = self._search_page_index_queries(query_parts, requested_top_k)
+        fused_hits = self._fuse_hits(query, semantic_hits, structural_hits, requested_top_k)
+        grounded_hits = self._filter_grounded_hits(fused_hits)
+        return grounded_hits[:requested_top_k]
 
     def search_by_vector(self, query_vector, top_k: int) -> list[dict]:
         return self.vector_store.search(query_vector, top_k)
@@ -107,25 +116,12 @@ class Retriever:
             return explicit_override
 
         has_legal_intent = self._has_legal_intent(query)
-        exact_hits = self.lookup_exact_reference(query, self.settings.top_k_retrieval)
-        if exact_hits:
-            top_corpus_score = exact_hits[0]["score"] if exact_hits else 0.0
-            return {
-                "in_scope": True,
-                "hits": exact_hits,
-                "has_legal_intent": True,
-                "grounded_hit_count": len(exact_hits),
-                "legal_anchor_score": 1.0,
-                "non_legal_anchor_score": 0.0,
-                "anchor_margin": 1.0,
-                "top_corpus_score": round(top_corpus_score, 4),
-            }
-
-        query_vector = self.embeddings.encode_query(query)
-        raw_hits = self.search_by_vector(query_vector, max(self.settings.top_k_retrieval * 4, 12))
-        hits = self._rerank_hits(query, raw_hits, self.settings.top_k_retrieval)
+        hits = self.search(query, self.settings.top_k_retrieval)
         grounded_hits = self._filter_grounded_hits(hits)
         top_corpus_score = grounded_hits[0]["score"] if grounded_hits else 0.0
+        top_page_index_score = max((float(item.get("page_index_score", 0.0)) for item in grounded_hits), default=0.0)
+
+        query_vector = self.embeddings.encode_query(query)
         legal_anchor_score = self.embeddings.max_similarity(query_vector, self.embeddings.legal_scope_anchor_embeddings)
         non_legal_anchor_score = self.embeddings.max_similarity(query_vector, self.embeddings.non_legal_scope_anchor_embeddings)
         anchor_margin = legal_anchor_score - non_legal_anchor_score
@@ -133,8 +129,11 @@ class Retriever:
             legal_anchor_score >= self.settings.legal_scope_anchor_threshold
             and anchor_margin >= self.settings.legal_scope_margin
         )
+        structural_legal_match = top_page_index_score >= self.settings.page_index_scope_threshold
         in_scope = has_legal_intent and bool(grounded_hits) and (
-            semantic_legal_match or top_corpus_score >= self.settings.legal_scope_corpus_threshold
+            semantic_legal_match
+            or top_corpus_score >= self.settings.legal_scope_corpus_threshold
+            or structural_legal_match
         )
         return {
             "in_scope": in_scope,
@@ -145,7 +144,145 @@ class Retriever:
             "non_legal_anchor_score": round(non_legal_anchor_score, 4),
             "anchor_margin": round(anchor_margin, 4),
             "top_corpus_score": round(top_corpus_score, 4),
+            "top_page_index_score": round(top_page_index_score, 4),
+            "hybrid_confidence": round(top_corpus_score, 4),
         }
+
+    def get_structure_overview(self, query: str) -> dict | None:
+        return self.page_index.get_structure_overview(query)
+
+    def _search_semantic_queries(self, query_parts: list[str], top_k: int) -> list[dict]:
+        merged: dict[str, dict] = {}
+        candidate_top_k = max(top_k * 4, 12)
+        for query in query_parts:
+            exact_hits = self._lookup_vector_exact_reference(query, max(top_k, 2))
+            for hit in exact_hits:
+                self._merge_hit(
+                    merged,
+                    hit,
+                    semantic_score=1.0,
+                    page_index_score=0.0,
+                    retrieval_mode="semantic",
+                )
+
+            query_vector = self.embeddings.encode_query(query)
+            raw_hits = self.search_by_vector(query_vector, candidate_top_k)
+            reranked = self._rerank_hits(query, raw_hits, candidate_top_k)
+            for hit in reranked:
+                self._merge_hit(
+                    merged,
+                    hit,
+                    semantic_score=self._normalize_semantic_score(hit.get("score", 0.0)),
+                    page_index_score=0.0,
+                    retrieval_mode="semantic",
+                )
+        return list(merged.values())
+
+    def _search_page_index_queries(self, query_parts: list[str], top_k: int) -> list[dict]:
+        merged: dict[str, dict] = {}
+        candidate_top_k = max(top_k * 2, self.settings.page_index_top_k)
+        for query in query_parts:
+            for hit in self.page_index.search(query, candidate_top_k):
+                self._merge_hit(
+                    merged,
+                    hit,
+                    semantic_score=0.0,
+                    page_index_score=hit.get("page_index_score", hit.get("score", 0.0)),
+                    retrieval_mode="page_index",
+                )
+        return list(merged.values())
+
+    def _merge_hit(
+        self,
+        merged: dict[str, dict],
+        hit: dict,
+        semantic_score: float,
+        page_index_score: float,
+        retrieval_mode: str,
+    ) -> None:
+        key = self._result_key(hit)
+        current = merged.get(key)
+        if current is None:
+            current = dict(hit)
+            current["semantic_score"] = 0.0
+            current["page_index_score"] = 0.0
+            current["retrieval_modes"] = []
+            merged[key] = current
+
+        current["semantic_score"] = max(float(current.get("semantic_score", 0.0)), float(semantic_score))
+        current["page_index_score"] = max(float(current.get("page_index_score", 0.0)), float(page_index_score))
+        current["retrieval_modes"] = sorted(set([*current.get("retrieval_modes", []), retrieval_mode]))
+
+        for field in ("source_id", "title", "citation", "text", "summary", "source_type", "document_type", "source_url", "chunk_strategy"):
+            if not current.get(field) and hit.get(field):
+                current[field] = hit.get(field)
+        if hit.get("reference_path"):
+            current["reference_path"] = hit["reference_path"]
+        if hit.get("linked_citations"):
+            linked = current.get("linked_citations", [])
+            for citation in hit["linked_citations"]:
+                if citation not in linked:
+                    linked.append(citation)
+            current["linked_citations"] = linked
+
+    def _fuse_hits(self, query: str, semantic_hits: list[dict], structural_hits: list[dict], top_k: int) -> list[dict]:
+        merged: dict[str, dict] = {}
+        for hit in semantic_hits:
+            self._merge_hit(
+                merged,
+                hit,
+                semantic_score=hit.get("semantic_score", 0.0),
+                page_index_score=hit.get("page_index_score", 0.0),
+                retrieval_mode="semantic",
+            )
+        for hit in structural_hits:
+            self._merge_hit(
+                merged,
+                hit,
+                semantic_score=hit.get("semantic_score", 0.0),
+                page_index_score=hit.get("page_index_score", hit.get("score", 0.0)),
+                retrieval_mode="page_index",
+            )
+
+        fused: list[dict] = []
+        for item in merged.values():
+            metadata_bonus = self._metadata_bonus(query, item)
+            hybrid_score = (
+                self.settings.hybrid_semantic_weight * float(item.get("semantic_score", 0.0))
+                + self.settings.hybrid_page_index_weight * float(item.get("page_index_score", 0.0))
+                + metadata_bonus
+            )
+            item["confidence"] = round(min(1.0, hybrid_score), 4)
+            item["score"] = round(hybrid_score, 6)
+            item["retrieval_mode"] = "+".join(item.get("retrieval_modes", [])) or "semantic"
+            fused.append(item)
+
+        reranked = self._rerank_hits(query, fused, max(top_k * 2, 8))
+        return reranked[:top_k]
+
+    def _metadata_bonus(self, query: str, item: dict) -> float:
+        bonus = 0.0
+        modes = set(item.get("retrieval_modes", []))
+        if {"semantic", "page_index"}.issubset(modes):
+            bonus += self.settings.hybrid_cross_signal_bonus
+        source_url = str(item.get("source_url", "")).lower()
+        if "indiacode.nic.in" in source_url or "legislative.gov.in" in source_url:
+            bonus += 0.04
+        citation = str(item.get("citation", ""))
+        if re.search(r"\|\s*section\s+\d+(?:\([\da-zA-Z]+\))?", citation, flags=re.IGNORECASE):
+            bonus += self.settings.hybrid_exact_reference_bonus
+        if item.get("linked_citations"):
+            bonus += min(0.03, len(item["linked_citations"]) * 0.01)
+        act = self._detect_statute(query.lower())
+        if act and self._matches_statute(item, act):
+            bonus += 0.03
+        return bonus
+
+    def _normalize_semantic_score(self, score: float) -> float:
+        return max(0.0, min(1.0, float(score)))
+
+    def _result_key(self, item: dict) -> str:
+        return str(item.get("chunk_id") or item.get("citation") or item.get("reference_path") or item.get("title"))
 
     def _warmup_embeddings(self) -> None:
         _ = self.embeddings.legal_scope_anchor_embeddings
@@ -165,6 +302,7 @@ class Retriever:
                 "non_legal_anchor_score": 1.0,
                 "anchor_margin": -1.0,
                 "top_corpus_score": 0.0,
+                "top_page_index_score": 0.0,
                 "explicit_out_of_scope": True,
                 "matched_non_legal_patterns": matched_non_legal,
             }
@@ -186,6 +324,28 @@ class Retriever:
         return from_official_host or (from_legal_source_type and has_legal_reference)
 
     def lookup_exact_reference(self, query: str, top_k: int) -> list[dict]:
+        merged: dict[str, dict] = {}
+        for hit in self._lookup_vector_exact_reference(query, top_k):
+            self._merge_hit(merged, hit, semantic_score=1.0, page_index_score=0.0, retrieval_mode="semantic")
+        for hit in self.page_index.lookup_exact_reference(query, top_k):
+            self._merge_hit(
+                merged,
+                hit,
+                semantic_score=0.0,
+                page_index_score=hit.get("page_index_score", hit.get("score", 0.0)),
+                retrieval_mode="page_index",
+            )
+        exact_hits = list(merged.values())
+        exact_hits.sort(
+            key=lambda item: (
+                float(item.get("page_index_score", 0.0)),
+                float(item.get("semantic_score", 0.0)),
+            ),
+            reverse=True,
+        )
+        return exact_hits[:top_k]
+
+    def _lookup_vector_exact_reference(self, query: str, top_k: int) -> list[dict]:
         normalized = query.lower()
         statute = self._detect_statute(normalized)
         if not statute:
@@ -218,6 +378,9 @@ class Retriever:
 
             exact_item = dict(item)
             exact_item["score"] = bonus
+            exact_item["semantic_score"] = bonus
+            exact_item["page_index_score"] = 0.0
+            exact_item["retrieval_modes"] = ["semantic"]
             ranked.append(exact_item)
 
         ranked.sort(key=lambda row: (row["score"], len(row.get("text", ""))), reverse=True)
@@ -267,6 +430,23 @@ class Retriever:
             )
         return False
 
+    def _decompose_query(self, query: str) -> list[str]:
+        normalized = re.sub(r"\s+", " ", query.strip())
+        if len(normalized.split()) < 12:
+            return [normalized]
+
+        fragments = re.split(r"[?;]|(?:\band\b)|(?:\bafter\b)|(?:\bbefore\b)|(?:\bwhile\b)|(?:\bwhere\b)", normalized, flags=re.IGNORECASE)
+        query_parts: list[str] = [normalized]
+        for fragment in fragments:
+            candidate = fragment.strip(" ,.")
+            if len(candidate.split()) < 4 or candidate.lower() == normalized.lower():
+                continue
+            if candidate not in query_parts:
+                query_parts.append(candidate)
+            if len(query_parts) >= 3:
+                break
+        return query_parts
+
     def _rerank_hits(self, query: str, hits: list[dict], top_k: int) -> list[dict]:
         normalized = query.lower()
         wants_bns = "bns" in normalized or "bharatiya nyaya sanhita" in normalized
@@ -295,6 +475,8 @@ class Retriever:
                 adjusted -= 0.06
             if re.search(r"\|\s*section\s+\d+\(\d+[a-z]?\)", item.get("citation", ""), flags=re.IGNORECASE):
                 adjusted += 0.04
+            if item.get("reference_path"):
+                adjusted += 0.03
             if wants_substantive_offence:
                 if "bns" in haystack or "bharatiya nyaya sanhita" in haystack:
                     adjusted += 0.16
