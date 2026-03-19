@@ -44,9 +44,7 @@ def get_page_index_store() -> PageIndexStore:
 
 @lru_cache
 def get_retriever() -> Retriever:
-    retriever = Retriever(get_settings(), get_embedding_service(), get_vector_store(), get_page_index_store())
-    retriever.ensure_index()
-    return retriever
+    return Retriever(get_settings(), get_embedding_service(), get_vector_store(), get_page_index_store())
 
 
 @lru_cache

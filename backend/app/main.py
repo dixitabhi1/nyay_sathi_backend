@@ -1,4 +1,6 @@
 from contextlib import asynccontextmanager
+import logging
+import threading
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
@@ -11,11 +13,21 @@ from app.db.analytics import init_analytics_db
 from app.db.session import init_db
 
 
+logger = logging.getLogger(__name__)
+
+
+def _warm_retriever_in_background() -> None:
+    try:
+        get_retriever().ensure_index()
+    except Exception as exc:  # pragma: no cover - defensive startup guard for hosted runtimes
+        logger.warning("Retriever warmup skipped during startup: %s", exc)
+
+
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     init_db()
     init_analytics_db()
-    get_retriever().ensure_index()
+    threading.Thread(target=_warm_retriever_in_background, daemon=True).start()
     yield
 
 

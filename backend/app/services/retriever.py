@@ -98,7 +98,12 @@ class Retriever:
             self.page_index.build(documents)
         self._warmup_embeddings()
 
+    def ensure_ready(self) -> None:
+        if not self.vector_store.exists() or not self.page_index.exists():
+            self.ensure_index()
+
     def search(self, query: str, top_k: int | None = None) -> list[dict]:
+        self.ensure_ready()
         requested_top_k = top_k or self.settings.top_k_retrieval
         query_parts = self._expand_query_parts(self._decompose_query(query))
         semantic_hits = self._search_semantic_queries(query_parts, requested_top_k)
@@ -108,9 +113,11 @@ class Retriever:
         return grounded_hits[:requested_top_k]
 
     def search_by_vector(self, query_vector, top_k: int) -> list[dict]:
+        self.ensure_ready()
         return self.vector_store.search(query_vector, top_k)
 
     def assess_scope(self, query: str) -> dict:
+        self.ensure_ready()
         explicit_override = self._explicit_scope_override(query)
         if explicit_override is not None:
             return explicit_override
@@ -149,6 +156,7 @@ class Retriever:
         }
 
     def get_structure_overview(self, query: str) -> dict | None:
+        self.ensure_ready()
         return self.page_index.get_structure_overview(query)
 
     def _search_semantic_queries(self, query_parts: list[str], top_k: int) -> list[dict]:
