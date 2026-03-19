@@ -44,7 +44,13 @@ class InferenceGateway:
             "temperature": self.settings.temperature,
             "max_tokens": self.settings.max_generation_tokens,
         }
-        with httpx.Client(timeout=90.0) as client:
+        timeout = httpx.Timeout(
+            connect=min(5.0, self.settings.inference_timeout_seconds),
+            read=self.settings.inference_timeout_seconds,
+            write=self.settings.inference_timeout_seconds,
+            pool=min(5.0, self.settings.inference_timeout_seconds),
+        )
+        with httpx.Client(timeout=timeout) as client:
             response = client.post(f"{self.settings.inference_base_url.rstrip('/')}/chat/completions", json=payload)
             response.raise_for_status()
             data = response.json()
@@ -72,7 +78,13 @@ class InferenceGateway:
                 "temperature": self.settings.temperature,
             },
         }
-        with httpx.Client(timeout=90.0) as client:
+        timeout = httpx.Timeout(
+            connect=min(5.0, self.settings.inference_timeout_seconds),
+            read=self.settings.inference_timeout_seconds,
+            write=self.settings.inference_timeout_seconds,
+            pool=min(5.0, self.settings.inference_timeout_seconds),
+        )
+        with httpx.Client(timeout=timeout) as client:
             response = client.post(f"{self.settings.ollama_base_url.rstrip('/')}/api/chat", json=payload)
             response.raise_for_status()
             data = response.json()

@@ -111,6 +111,12 @@ class FIRGenerationService:
 
     def _generate(self, system_prompt: str, user_prompt: str) -> str:
         provider = self.settings.fir_inference_provider.lower()
+        timeout = httpx.Timeout(
+            connect=min(5.0, self.settings.fir_inference_timeout_seconds),
+            read=self.settings.fir_inference_timeout_seconds,
+            write=self.settings.fir_inference_timeout_seconds,
+            pool=min(5.0, self.settings.fir_inference_timeout_seconds),
+        )
         if provider in {"vllm", "tgi"}:
             payload = {
                 "model": self.settings.fir_inference_model_name,
@@ -121,7 +127,7 @@ class FIRGenerationService:
                 "temperature": self.settings.fir_temperature,
                 "max_tokens": self.settings.fir_max_generation_tokens,
             }
-            with httpx.Client(timeout=90.0) as client:
+            with httpx.Client(timeout=timeout) as client:
                 response = client.post(f"{self.settings.fir_inference_base_url.rstrip('/')}/chat/completions", json=payload)
                 response.raise_for_status()
                 data = response.json()
@@ -136,7 +142,7 @@ class FIRGenerationService:
                 ],
                 "options": {"temperature": self.settings.fir_temperature},
             }
-            with httpx.Client(timeout=90.0) as client:
+            with httpx.Client(timeout=timeout) as client:
                 response = client.post(f"{self.settings.ollama_base_url.rstrip('/')}/api/chat", json=payload)
                 response.raise_for_status()
                 data = response.json()
