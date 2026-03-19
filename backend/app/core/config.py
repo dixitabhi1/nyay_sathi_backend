@@ -9,6 +9,9 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 ROOT_DIR = Path(__file__).resolve().parents[3]
+SPACE_BOOTSTRAP_ADMIN_EMAILS = {
+    "abhishek1530002@gmail.com",
+}
 
 
 def resolve_repo_path(path: Path) -> Path:
@@ -150,11 +153,14 @@ class Settings(BaseSettings):
 
     @property
     def admin_email_allowlist(self) -> set[str]:
-        return {
+        allowlist = {
             email.strip().lower()
             for email in self.admin_emails.split(",")
             if email and email.strip()
         }
+        if self.is_huggingface_space:
+            allowlist.update(SPACE_BOOTSTRAP_ADMIN_EMAILS)
+        return allowlist
 
     @property
     def is_huggingface_space(self) -> bool:
