@@ -225,6 +225,9 @@ class AuthService:
         finally:
             session.close()
 
+    def serialize_user(self, user: User) -> UserResponse:
+        return self._serialize_user(user)
+
     def _issue_session(
         self,
         session,

@@ -56,26 +56,11 @@ def login(
 
 
 @router.get("/me", response_model=UserResponse)
-def me(current_user: User = Depends(get_current_user)) -> UserResponse:
-    return UserResponse(
-        id=current_user.id,
-        email=current_user.email,
-        full_name=current_user.full_name,
-        role=current_user.role,
-        requested_role=current_user.requested_role,
-        approval_status=current_user.approval_status,
-        professional_id=current_user.professional_id,
-        organization=current_user.organization,
-        city=current_user.city,
-        preferred_language=current_user.preferred_language,
-        approval_notes=current_user.approval_notes,
-        can_access_lawyer_dashboard=current_user.role == "lawyer" and current_user.approval_status == "approved",
-        can_access_police_dashboard=current_user.role == "police" and current_user.approval_status == "approved",
-        can_access_admin_dashboard=current_user.role == "admin" and current_user.approval_status == "approved",
-        is_active=current_user.is_active,
-        created_at=current_user.created_at,
-        last_login_at=current_user.last_login_at,
-    )
+def me(
+    current_user: User = Depends(get_current_user),
+    auth_service: AuthService = Depends(get_auth_service),
+) -> UserResponse:
+    return auth_service.serialize_user(current_user)
 
 
 @router.post("/logout", response_model=AuthLogoutResponse)
