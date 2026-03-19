@@ -59,8 +59,16 @@ def _engine_responds(candidate_engine) -> bool:
 
 
 try:
-    engine = create_engine(settings.resolved_database_url, **engine_kwargs)
-    if settings.resolved_database_url.startswith("sqlite+libsql://") and not _engine_responds(engine):
+    if (
+        settings.prefer_local_app_db_on_space
+        and settings.is_huggingface_space
+        and settings.resolved_database_url.startswith("sqlite+libsql://")
+    ):
+        logger.warning("Running on Hugging Face Space with local app DB preference enabled. Using SQLite fallback.")
+        engine = _build_sqlite_fallback_engine()
+    else:
+        engine = create_engine(settings.resolved_database_url, **engine_kwargs)
+    if settings.resolved_database_url.startswith("sqlite+libsql://") and engine.url.drivername == "sqlite+libsql" and not _engine_responds(engine):
         engine.dispose()
         engine = _build_sqlite_fallback_engine()
 except NoSuchModuleError:

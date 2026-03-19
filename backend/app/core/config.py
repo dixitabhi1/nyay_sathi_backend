@@ -1,4 +1,5 @@
 from functools import lru_cache
+import os
 from pathlib import Path
 import secrets
 from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
@@ -65,6 +66,7 @@ class Settings(BaseSettings):
     auth_token_ttl_hours: int = Field(default=24, alias="AUTH_TOKEN_TTL_HOURS")
     admin_emails: str = Field(default="", alias="ADMIN_EMAILS")
     database_probe_timeout_seconds: float = Field(default=4.0, alias="DATABASE_PROBE_TIMEOUT_SECONDS")
+    prefer_local_app_db_on_space: bool = Field(default=True, alias="PREFER_LOCAL_APP_DB_ON_SPACE")
     persistent_storage_root: Path | None = Field(default=None, alias="PERSISTENT_STORAGE_ROOT")
 
     app_sqlite_path: Path = Field(default=Path("storage/db/nyayasetu.sqlite3"), alias="APP_SQLITE_PATH")
@@ -153,6 +155,10 @@ class Settings(BaseSettings):
             for email in self.admin_emails.split(",")
             if email and email.strip()
         }
+
+    @property
+    def is_huggingface_space(self) -> bool:
+        return bool(os.getenv("SPACE_ID") or os.getenv("SPACE_HOST"))
 
 
 @lru_cache
