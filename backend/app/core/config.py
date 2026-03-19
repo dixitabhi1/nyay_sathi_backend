@@ -64,6 +64,7 @@ class Settings(BaseSettings):
     auth_secret_key: str = Field(default_factory=lambda: secrets.token_urlsafe(48), alias="AUTH_SECRET_KEY")
     auth_token_ttl_hours: int = Field(default=24, alias="AUTH_TOKEN_TTL_HOURS")
     admin_emails: str = Field(default="", alias="ADMIN_EMAILS")
+    database_probe_timeout_seconds: float = Field(default=4.0, alias="DATABASE_PROBE_TIMEOUT_SECONDS")
     persistent_storage_root: Path | None = Field(default=None, alias="PERSISTENT_STORAGE_ROOT")
 
     app_sqlite_path: Path = Field(default=Path("storage/db/nyayasetu.sqlite3"), alias="APP_SQLITE_PATH")

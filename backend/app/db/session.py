@@ -1,7 +1,9 @@
 from collections.abc import Generator
+from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeoutError
+import logging
 
-from sqlalchemy import create_engine, inspect
-from sqlalchemy.exc import NoSuchModuleError
+from sqlalchemy import create_engine, inspect, text
+from sqlalchemy.exc import NoSuchModuleError, SQLAlchemyError
 from sqlalchemy.orm import DeclarativeBase, sessionmaker
 
 from app.core.config import get_settings
@@ -12,17 +14,57 @@ class Base(DeclarativeBase):
 
 
 settings = get_settings()
+logger = logging.getLogger(__name__)
 engine_kwargs: dict = {"future": True}
 if settings.resolved_database_connect_args:
     engine_kwargs["connect_args"] = settings.resolved_database_connect_args
 if settings.resolved_database_url.startswith("sqlite+libsql://"):
     engine_kwargs["pool_pre_ping"] = True
+fallback_url = f"sqlite+pysqlite:///{settings.app_sqlite_path.resolve().as_posix()}"
+fallback_kwargs = {"future": True, "connect_args": {"check_same_thread": False}}
+
+
+def _build_sqlite_fallback_engine():
+    logger.warning("Using local SQLite fallback database at %s", settings.app_sqlite_path)
+    return create_engine(fallback_url, **fallback_kwargs)
+
+
+def _ping_engine(candidate_engine) -> None:
+    with candidate_engine.connect() as connection:
+        connection.execute(text("SELECT 1"))
+
+
+def _engine_responds(candidate_engine) -> bool:
+    executor = ThreadPoolExecutor(max_workers=1)
+    future = executor.submit(_ping_engine, candidate_engine)
+    try:
+        future.result(timeout=settings.database_probe_timeout_seconds)
+        executor.shutdown(wait=False, cancel_futures=True)
+        return True
+    except FuturesTimeoutError:
+        logger.warning(
+            "Database probe exceeded %.1fs. Falling back to local SQLite.",
+            settings.database_probe_timeout_seconds,
+        )
+        executor.shutdown(wait=False, cancel_futures=True)
+        return False
+    except SQLAlchemyError as exc:
+        logger.warning("Database probe failed: %s. Falling back to local SQLite.", exc)
+        executor.shutdown(wait=False, cancel_futures=True)
+        return False
+    except Exception as exc:  # pragma: no cover - defensive fallback for hosted DB drivers
+        logger.warning("Unexpected database probe failure: %s. Falling back to local SQLite.", exc)
+        executor.shutdown(wait=False, cancel_futures=True)
+        return False
+
+
 try:
     engine = create_engine(settings.resolved_database_url, **engine_kwargs)
+    if settings.resolved_database_url.startswith("sqlite+libsql://") and not _engine_responds(engine):
+        engine.dispose()
+        engine = _build_sqlite_fallback_engine()
 except NoSuchModuleError:
-    fallback_url = f"sqlite+pysqlite:///{settings.app_sqlite_path.resolve().as_posix()}"
-    fallback_kwargs = {"future": True, "connect_args": {"check_same_thread": False}}
-    engine = create_engine(fallback_url, **fallback_kwargs)
+    engine = _build_sqlite_fallback_engine()
 SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False, future=True)
 
 
