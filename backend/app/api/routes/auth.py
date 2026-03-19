@@ -71,6 +71,7 @@ def me(current_user: User = Depends(get_current_user)) -> UserResponse:
         approval_notes=current_user.approval_notes,
         can_access_lawyer_dashboard=current_user.role == "lawyer" and current_user.approval_status == "approved",
         can_access_police_dashboard=current_user.role == "police" and current_user.approval_status == "approved",
+        can_access_admin_dashboard=current_user.role == "admin" and current_user.approval_status == "approved",
         is_active=current_user.is_active,
         created_at=current_user.created_at,
         last_login_at=current_user.last_login_at,

@@ -63,6 +63,7 @@ class Settings(BaseSettings):
     frontend_url: str = Field(default="http://localhost:5173", alias="FRONTEND_URL")
     auth_secret_key: str = Field(default_factory=lambda: secrets.token_urlsafe(48), alias="AUTH_SECRET_KEY")
     auth_token_ttl_hours: int = Field(default=24, alias="AUTH_TOKEN_TTL_HOURS")
+    admin_emails: str = Field(default="", alias="ADMIN_EMAILS")
     persistent_storage_root: Path | None = Field(default=None, alias="PERSISTENT_STORAGE_ROOT")
 
     app_sqlite_path: Path = Field(default=Path("storage/db/nyayasetu.sqlite3"), alias="APP_SQLITE_PATH")
@@ -141,6 +142,14 @@ class Settings(BaseSettings):
         if self.resolved_database_url.startswith("sqlite"):
             return {"check_same_thread": False}
         return {}
+
+    @property
+    def admin_email_allowlist(self) -> set[str]:
+        return {
+            email.strip().lower()
+            for email in self.admin_emails.split(",")
+            if email and email.strip()
+        }
 
 
 @lru_cache

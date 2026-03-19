@@ -1,8 +1,12 @@
 from fastapi import APIRouter, Depends
 
+from app.core.security import get_current_admin_user
 from app.core.dependencies import get_audit_service, get_corpus_registry
-from app.schemas.admin import CorpusStatusResponse, DatasetRefreshRequest, DatasetRefreshResponse
+from app.core.dependencies import get_admin_service
+from app.models.auth import User
+from app.schemas.admin import AdminDashboardResponse, CorpusStatusResponse, DatasetRefreshRequest, DatasetRefreshResponse
 from app.services.audit import AuditService
+from app.services.admin import AdminService
 from app.services.corpus_registry import CorpusRegistry
 
 
@@ -27,3 +31,12 @@ def corpus_status(
     registry: CorpusRegistry = Depends(get_corpus_registry),
 ) -> CorpusStatusResponse:
     return registry.get_status()
+
+
+@router.get("/dashboard", response_model=AdminDashboardResponse)
+def admin_dashboard(
+    limit: int = 12,
+    admin_service: AdminService = Depends(get_admin_service),
+    current_user: User = Depends(get_current_admin_user),
+) -> AdminDashboardResponse:
+    return admin_service.get_dashboard(limit=limit)

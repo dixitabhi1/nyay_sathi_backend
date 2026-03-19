@@ -96,6 +96,16 @@ Using structure-aware retrieval improves:
 - grounded navigation across related provisions
 - hallucination resistance on statute-structure queries
 
+## Product Workflows That Use Hybrid Retrieval
+
+The hybrid retriever is not only for chatbot answers. In NyayaSetu it also supports:
+
+- citizen legal guidance where plain-language questions need exact section grounding
+- FIR section suggestions and comparative `BNS`, `BNSS`, `IPC`, and `CrPC` mapping
+- lawyer review notes that need both semantic context and exact provision references
+- police-facing FIR drafting where the application text must be connected to the right procedural section
+- admin review workflows where staff need explainable references while checking professional applications or FIR activity
+
 ## Scalability Notes
 
 The architecture scales by separating concerns:

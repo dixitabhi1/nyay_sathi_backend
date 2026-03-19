@@ -4,6 +4,7 @@ from app.core.config import Settings, get_settings
 from app.db.analytics import init_analytics_db
 from app.db.session import init_db
 from app.services.audit import AuditService
+from app.services.admin import AdminService
 from app.services.auth import AuthService
 from app.services.crime_pattern import CrimePatternService
 from app.services.evidence_intelligence import EvidenceIntelligenceService
@@ -116,6 +117,12 @@ def get_audit_service() -> AuditService:
 def get_auth_service() -> AuthService:
     init_db()
     return AuthService(get_settings())
+
+
+@lru_cache
+def get_admin_service() -> AdminService:
+    init_db()
+    return AdminService(get_auth_service())
 
 
 @lru_cache

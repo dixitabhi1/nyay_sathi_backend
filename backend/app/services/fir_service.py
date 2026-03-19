@@ -136,12 +136,13 @@ class FIRService:
         self,
         complaint_file: UploadFile,
         police_station: str | None = None,
-        draft_role: str = "police_fir",
+        draft_role: str = "citizen_application",
         draft_language: str = "en",
         user_id: str | None = None,
     ) -> FIRRecordResponse:
-        saved_path = await self.document_ingestion.save_upload(complaint_file)
-        extracted_text = await self.document_ingestion.extract_text(complaint_file)
+        content = await self.document_ingestion.read_upload_bytes(complaint_file)
+        saved_path = await self.document_ingestion.save_upload(complaint_file, content=content)
+        extracted_text = await self.document_ingestion.extract_text(complaint_file, content=content)
         structured = self.extraction_service.extract_from_text(
             extracted_text,
             defaults={"police_station": police_station},
@@ -167,10 +168,11 @@ class FIRService:
         self,
         complaint_file: UploadFile,
         police_station: str | None = None,
-        draft_role: str = "police_fir",
+        draft_role: str = "citizen_application",
         draft_language: str = "en",
     ) -> FIRUploadIntakeResponse:
-        extracted_text = await self.document_ingestion.extract_text(complaint_file)
+        content = await self.document_ingestion.read_upload_bytes(complaint_file)
+        extracted_text = await self.document_ingestion.extract_text(complaint_file, content=content)
         cleaned_text = self.extraction_service.clean_text(extracted_text)
         structured = self.extraction_service.extract_from_text(cleaned_text, defaults={"police_station": police_station})
         sections, reasoning = self.classifier.classify(structured.incident_description)

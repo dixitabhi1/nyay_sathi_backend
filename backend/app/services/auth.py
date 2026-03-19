@@ -12,8 +12,10 @@ from fastapi import HTTPException, status
 from app.core.config import Settings
 from app.db.session import SessionLocal
 from app.models.auth import AuthSession, User
+from app.models.lawyer import LawyerProfile
 from app.schemas.auth import (
     AuthTokenResponse,
+    PendingRoleApplicationLinkedProfileResponse,
     PendingRoleApplicationResponse,
     PendingRoleApplicationsResponse,
     UserResponse,
@@ -49,6 +51,11 @@ class AuthService:
     ) -> AuthTokenResponse:
         normalized_email = self._normalize_email(email)
         requested_role = self._normalize_role(role)
+        if requested_role == "admin" and not self._is_admin_email(normalized_email):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Admin registration is restricted to configured operator emails.",
+            )
         session = SessionLocal()
         try:
             existing = session.query(User).filter(User.email == normalized_email).first()
@@ -110,22 +117,34 @@ class AuthService:
         try:
             rows = (
                 session.query(User)
+                .filter(User.requested_role.in_(APPROVAL_REQUIRED_ROLES))
                 .filter(User.approval_status.in_(["pending", "rejected"]))
                 .order_by(User.created_at.desc())
                 .all()
             )
+            profiles = {
+                profile.user_id: profile
+                for profile in session.query(LawyerProfile)
+                .filter(LawyerProfile.user_id.is_not(None))
+                .all()
+                if profile.user_id
+            }
             return PendingRoleApplicationsResponse(
                 applications=[
                     PendingRoleApplicationResponse(
                         id=row.id,
                         email=row.email,
                         full_name=row.full_name,
+                        role=row.role,
                         requested_role=row.requested_role,
                         approval_status=row.approval_status,
                         professional_id=row.professional_id,
                         organization=row.organization,
                         city=row.city,
                         preferred_language=row.preferred_language,
+                        approval_notes=row.approval_notes,
+                        last_login_at=row.last_login_at,
+                        linked_profile=self._serialize_linked_profile(profiles.get(row.id)),
                         created_at=row.created_at,
                     )
                     for row in rows
@@ -237,6 +256,9 @@ class AuthService:
     def _serialize_user(self, user: User) -> UserResponse:
         can_access_lawyer_dashboard = user.role == "lawyer" and user.approval_status == "approved"
         can_access_police_dashboard = user.role == "police" and user.approval_status == "approved"
+        can_access_admin_dashboard = self._is_admin_email(user.email) or (
+            user.role == "admin" and user.approval_status == "approved"
+        )
         return UserResponse(
             id=user.id,
             email=user.email,
@@ -251,9 +273,24 @@ class AuthService:
             approval_notes=user.approval_notes,
             can_access_lawyer_dashboard=can_access_lawyer_dashboard,
             can_access_police_dashboard=can_access_police_dashboard,
+            can_access_admin_dashboard=can_access_admin_dashboard,
             is_active=user.is_active,
             created_at=user.created_at,
             last_login_at=user.last_login_at,
+        )
+
+    def _serialize_linked_profile(
+        self,
+        profile: LawyerProfile | None,
+    ) -> PendingRoleApplicationLinkedProfileResponse | None:
+        if profile is None:
+            return None
+        return PendingRoleApplicationLinkedProfileResponse(
+            handle=profile.handle,
+            verification_status=profile.verification_status,
+            specialization=profile.specialization,
+            bar_council_id=profile.bar_council_id,
+            city=profile.city,
         )
 
     def _normalize_email(self, email: str) -> str:
@@ -295,3 +332,6 @@ class AuthService:
     def _hash_token(self, token: str) -> str:
         secret = self.settings.auth_secret_key.encode("utf-8")
         return hmac.new(secret, token.encode("utf-8"), hashlib.sha256).hexdigest()
+
+    def _is_admin_email(self, email: str) -> bool:
+        return email.strip().lower() in self.settings.admin_email_allowlist

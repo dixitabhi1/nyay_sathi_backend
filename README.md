@@ -17,6 +17,13 @@ Hybrid retrieval note:
 - NyayaSetu now uses semantic RAG plus a structure-aware PageIndex layer for act, chapter, section, and clause navigation.
 - Architecture details are documented in `docs/NyayaSetu_Hybrid_Retrieval_Architecture.md`.
 
+Platform workflow note:
+
+- Citizen accounts activate immediately after registration.
+- Lawyer and police accounts store a requested role and stay pending until an approved admin account reviews them.
+- FIR workflows now support `citizen_application`, `police_fir`, and `lawyer_analysis` document tracks.
+- Citizen complaint applications can be exported as PDF after generation.
+
 ## Architecture
 
 ```mermaid
@@ -82,6 +89,7 @@ Suggested Space settings:
 - Visibility: `Private` for personal use
 - Secrets:
   - `AUTH_SECRET_KEY`: required if you want login tokens to remain valid across Space restarts
+  - `ADMIN_EMAILS`: comma-separated operator emails that can access the admin dashboard
   - `FRONTEND_URL`: your deployed frontend domain
   - `TURSO_DATABASE_URL`: optional external app database such as `libsql://your-db-name-your-org.turso.io`
   - `TURSO_AUTH_TOKEN`: required when `TURSO_DATABASE_URL` points at a protected Turso database
@@ -185,16 +193,44 @@ Target corpus scale:
 ## Backend API
 
 - `GET /api/v1/health`
+- `POST /api/v1/auth/register`
+- `POST /api/v1/auth/login`
+- `GET /api/v1/auth/me`
+- `GET /api/v1/auth/approvals`
+- `POST /api/v1/auth/approvals/{user_id}`
 - `POST /api/v1/chat/query`
 - `POST /api/v1/analysis/case`
 - `POST /api/v1/analysis/strength`
 - `POST /api/v1/analysis/draft`
 - `POST /api/v1/analysis/fir`
+- `POST /api/v1/fir/manual/preview`
+- `POST /api/v1/fir/upload/preview`
+- `POST /api/v1/fir/upload`
+- `POST /api/v1/fir/voice/preview`
+- `POST /api/v1/fir/voice`
+- `GET /api/v1/fir/{fir_id}/documents/{document_kind}.pdf`
 - `POST /api/v1/research/search`
 - `POST /api/v1/documents/contract/analyze`
 - `POST /api/v1/documents/evidence/analyze`
 - `POST /api/v1/admin/dataset/refresh`
 - `GET /api/v1/admin/corpus/status`
+- `GET /api/v1/admin/dashboard`
+
+## Role-Aware Access and Admin Operations
+
+- Citizens can use legal chat, FIR drafting, research, and document workflows immediately after registration.
+- Lawyers and police users choose their role at account creation and submit supporting details such as professional ID, organization, city, and preferred language.
+- Until approved, professional users continue to operate as citizen accounts while their requested role and approval state remain visible in the auth profile.
+- Admin access is restricted to emails listed in `ADMIN_EMAILS`, and those operator accounts can review pending lawyer and police applications, inspect linked lawyer profile details, and monitor recent FIR activity from a single admin dashboard.
+- Lawyer and police dashboards are visible only to the corresponding approved role, and the admin dashboard is visible only to configured operator accounts.
+
+## FIR Studio Workflows
+
+- `Citizen Application`: creates a complaint application suitable for submission to a police station or officer.
+- `Police FIR Draft`: transforms the complaint into a structured FIR draft with comparative `BNS`, `BNSS`, `IPC`, and `CrPC` references.
+- `Lawyer FIR Analysis`: generates a lawyer-facing note with section mapping, procedural review points, and evidence checks.
+- Manual entry, complaint upload, and voice intake all feed the same structured FIR pipeline.
+- OCR failures now return user-facing validation messages instead of raw server errors whenever extraction cannot be completed reliably.
 
 ## Inference Modes
 
@@ -263,3 +299,4 @@ docker compose --profile ollama up ollama backend
 - The sample corpus remains only as a fallback bootstrap if the official corpus has not yet been built.
 - Some official portals, especially High Courts and eCourts, need source-specific manifest entries because each court exposes judgments differently.
 - All outputs remain informational and should be reviewed by qualified counsel before use.
+- Presentation-support prompt: `docs/NyayaSetu_PPT_Generation_Prompt.md`

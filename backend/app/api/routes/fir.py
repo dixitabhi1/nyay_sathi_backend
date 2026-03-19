@@ -57,7 +57,7 @@ def preview_manual_fir(
 async def preview_uploaded_complaint(
     complaint_file: UploadFile = File(...),
     police_station: str | None = Form(default=None),
-    draft_role: str = Form(default="police_fir"),
+    draft_role: str = Form(default="citizen_application"),
     language: str = Form(default="en"),
     fir_service: FIRService = Depends(get_fir_service),
 ) -> FIRUploadIntakeResponse:
@@ -73,7 +73,7 @@ async def preview_uploaded_complaint(
 async def create_fir_from_upload(
     complaint_file: UploadFile = File(...),
     police_station: str | None = Form(default=None),
-    draft_role: str = Form(default="police_fir"),
+    draft_role: str = Form(default="citizen_application"),
     language: str = Form(default="en"),
     user_id: str | None = Form(default=None),
     fir_service: FIRService = Depends(get_fir_service),

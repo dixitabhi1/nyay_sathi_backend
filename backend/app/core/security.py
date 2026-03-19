@@ -1,6 +1,7 @@
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
+from app.core.config import get_settings
 from app.core.dependencies import get_auth_service
 from app.models.auth import User
 from app.services.auth import AuthService
@@ -50,7 +51,9 @@ def get_current_police_user(current_user: User = Depends(require_approved_role("
 
 
 def get_current_admin_user(current_user: User = Depends(get_current_user)) -> User:
-    if current_user.role != "admin" or current_user.approval_status != "approved":
+    settings = get_settings()
+    is_allowlisted_admin = current_user.email.strip().lower() in settings.admin_email_allowlist
+    if not is_allowlisted_admin and (current_user.role != "admin" or current_user.approval_status != "approved"):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="This action requires an approved admin account.",

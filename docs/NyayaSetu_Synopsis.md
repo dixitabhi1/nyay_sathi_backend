@@ -29,6 +29,7 @@ The key objectives of NyayaSetu are:
 - To provide accessible legal question answering for Indian law.
 - To assist in mapping incidents to likely IPC or BNS sections.
 - To generate structured and editable FIR drafts from multiple input modes.
+- To generate role-specific FIR outputs for citizens, police, and lawyers from the same complaint record.
 - To support legal research through semantic retrieval of statutes and case materials.
 - To generate legal drafts such as notices, complaints, and structured legal documents.
 - To analyze contracts for clauses, risks, and missing protections.
@@ -36,6 +37,7 @@ The key objectives of NyayaSetu are:
 - To estimate case strength based on evidence and procedural inputs.
 - To support multilingual legal workflows, especially English and Hindi.
 - To maintain a self-hosted, privacy-preserving, open-source deployment model.
+- To support role-aware onboarding and approval workflows for police and lawyer accounts.
 
 ## 5. Proposed Solution
 
@@ -43,7 +45,7 @@ NyayaSetu is proposed as a complete AI-driven legal intelligence platform built 
 
 At the center of the system is a RAG pipeline. Legal texts from official sources are cleaned, chunked, embedded, indexed in FAISS, and stored with metadata in DuckDB and JSONL. When a user submits a legal question or document, the system converts the query into an embedding, retrieves the most relevant legal chunks, and uses those retrieved materials to generate a grounded answer or legal draft. This improves factual grounding and reduces hallucinated output.
 
-For FIR generation, NyayaSetu accepts manual entry, uploaded complaint documents, and voice transcripts. OCR and speech recognition extract text, entity extraction structures the complaint, a section classifier suggests likely BNS sections, and the system produces an editable FIR draft with reasoning, completeness checks, and version history support.
+For FIR generation, NyayaSetu accepts manual entry, uploaded complaint documents, and voice transcripts. OCR and speech recognition extract text, entity extraction structures the complaint, a section classifier suggests likely BNS sections, and the system produces role-specific outputs including a citizen complaint application, police FIR draft, and lawyer review note. The FIR workflow also supports reasoning, completeness checks, comparative BNS/BNSS/IPC/CrPC mapping, PDF export for citizen applications, and version history support.
 
 The platform uses FastAPI for backend services, React for interactive frontend flows, FAISS for vector retrieval, SQLite for lightweight application state, DuckDB for corpus analytics, and self-hosted inference gateways for future deployment of fine-tuned open-source models.
 
@@ -75,7 +77,7 @@ The Evidence Analyzer processes uploaded or pasted evidence material and extract
 
 ### 6.7 FIR Generator
 
-The FIR Generator is one of the core modules of NyayaSetu. It supports manual FIR entry, complaint upload, and voice FIR filing. The module extracts structured information, predicts relevant BNS sections, generates legal reasoning, recommends jurisdiction, assesses completeness, and produces an editable FIR draft with version history.
+The FIR Generator is one of the core modules of NyayaSetu. It supports manual FIR entry, complaint upload, and voice FIR filing. The module extracts structured information, predicts relevant BNS sections, generates legal reasoning, recommends jurisdiction, assesses completeness, and produces three role-aware outputs: a citizen complaint application, a police FIR draft, and a lawyer FIR analysis note. The citizen application can be exported as PDF and each draft remains editable with version history.
 
 ### 6.8 Voice FIR Filing
 
@@ -103,7 +105,7 @@ Case strength is estimated using structured inputs such as number of evidence it
 
 ### 6.14 Admin and Dataset Management
 
-The project includes administrative support for updating datasets, refreshing the legal corpus, retraining models in the future, and monitoring corpus size or ingestion status.
+The project includes administrative support for updating datasets, refreshing the legal corpus, retraining models in the future, monitoring corpus size or ingestion status, and reviewing professional role applications. Operator emails configured through `ADMIN_EMAILS` can open the admin console, approve or reject pending police and lawyer accounts, and view supporting registration details, linked lawyer profiles, and recent FIR activity.
 
 ## 7. System Architecture
 
