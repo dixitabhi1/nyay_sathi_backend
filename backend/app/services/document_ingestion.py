@@ -80,11 +80,41 @@ class DocumentIngestionService:
                     status_code=422,
                     detail="NyayaSetu could not process the uploaded image text reliably. Please try a clearer image or a PDF version.",
                 )
-        if suffix in {".mp3", ".wav", ".m4a", ".webm", ".ogg"}:
-            import whisper
+        if suffix in {".mp3", ".wav", ".m4a", ".webm", ".ogg"} or content_type.startswith("audio/"):
+            try:
+                import whisper
+            except ImportError as exc:
+                raise HTTPException(
+                    status_code=503,
+                    detail="Audio transcription is not available in this environment right now. Please use the FIR mic transcription popup or paste the transcript text manually.",
+                ) from exc
 
-            temp_path = await self.save_upload(upload, content=payload)
-            model = whisper.load_model(self.settings.whisper_model)
-            transcript = model.transcribe(str(temp_path))
-            return transcript["text"]
+            try:
+                temp_path = await self.save_upload(upload, content=payload)
+                model = whisper.load_model(self.settings.whisper_model)
+                transcript = model.transcribe(str(temp_path))
+                text = str(transcript.get("text", "")).strip()
+                if text:
+                    return text
+                raise HTTPException(
+                    status_code=422,
+                    detail="NyayaSetu could not detect enough speech from this recording. Please try a clearer voice note or use the transcript popup.",
+                )
+            except HTTPException:
+                raise
+            except FileNotFoundError as exc:
+                raise HTTPException(
+                    status_code=503,
+                    detail="Audio transcription dependencies are missing in this environment. Please use the FIR mic transcription popup or enter transcript text manually.",
+                ) from exc
+            except RuntimeError as exc:
+                raise HTTPException(
+                    status_code=422,
+                    detail="NyayaSetu could not transcribe this audio clip reliably. Please try a shorter clear recording, or use the mic transcription popup and review the transcript before submitting.",
+                ) from exc
+            except Exception as exc:
+                raise HTTPException(
+                    status_code=422,
+                    detail="NyayaSetu could not process this audio file. Please try another recording format or use the transcript popup instead.",
+                ) from exc
         return payload.decode("utf-8", errors="ignore")

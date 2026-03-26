@@ -112,9 +112,18 @@ async def create_fir_from_voice(
 ) -> FIRRecordResponse:
     user_id = current_user.id if current_user else user_id
     payload = None
-    if transcript_text:
+    if any(
+        [
+            transcript_text is not None,
+            police_station is not None,
+            complainant_name is not None,
+            draft_role != "citizen_application",
+            language != "en",
+            user_id is not None,
+        ]
+    ):
         payload = FIRVoiceTranscriptRequest(
-            transcript_text=transcript_text,
+            transcript_text=transcript_text or "",
             police_station=police_station,
             complainant_name=complainant_name,
             draft_role=draft_role,
@@ -143,9 +152,18 @@ async def preview_voice_processing(
     current_user: User | None = Depends(get_optional_current_user),
 ) -> FIRVoiceProcessingResponse:
     payload = None
-    if transcript_text:
+    if any(
+        [
+            transcript_text is not None,
+            police_station is not None,
+            complainant_name is not None,
+            draft_role != "citizen_application",
+            language != "en",
+            current_user is not None,
+        ]
+    ):
         payload = FIRVoiceTranscriptRequest(
-            transcript_text=transcript_text,
+            transcript_text=transcript_text or "",
             police_station=police_station,
             complainant_name=complainant_name,
             draft_role=draft_role,

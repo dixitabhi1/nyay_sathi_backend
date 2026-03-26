@@ -207,66 +207,74 @@ class FIRService:
         audio_file: UploadFile | None = None,
         payload: FIRVoiceTranscriptRequest | None = None,
     ) -> FIRRecordResponse:
-        transcript_text: str
-        defaults: dict = {}
-        user_id: str | None = None
-        if payload:
-            transcript_text = self.extraction_service.clean_text(payload.transcript_text)
-            defaults = {
-                "police_station": payload.police_station,
-                "complainant_name": payload.complainant_name,
-            }
-            user_id = payload.user_id
+        defaults = {
+            "police_station": payload.police_station if payload else None,
+            "complainant_name": payload.complainant_name if payload else None,
+        }
+        user_id = payload.user_id if payload else None
+        draft_role = payload.draft_role if payload else "citizen_application"
+        draft_language = payload.language if payload else "en"
+        transcript_candidate = self.extraction_service.clean_text(payload.transcript_text) if payload else ""
+
+        saved_audio_path: Path | None = None
+        saved_audio_media_type: str | None = None
+        saved_audio_name: str | None = None
+
+        if transcript_candidate:
+            transcript_text = transcript_candidate
+            if audio_file:
+                audio_content = await self.document_ingestion.read_upload_bytes(audio_file)
+                saved_audio_path = await self.document_ingestion.save_upload(audio_file, content=audio_content)
+                saved_audio_media_type = audio_file.content_type or "audio/webm"
+                saved_audio_name = audio_file.filename or Path(saved_audio_path).name
         elif audio_file:
-            saved_path = await self.document_ingestion.save_upload(audio_file)
-            transcript_text = self.extraction_service.clean_text(await self.document_ingestion.extract_text(audio_file))
-            defaults = {}
-            user_id = None
-            structured = self.extraction_service.extract_from_text(transcript_text, defaults=defaults)
-            response = self._persist_fir_record(
-                workflow="voice",
-                structured=structured,
-                transcript_text=transcript_text,
-                user_id=user_id,
-                draft_role="citizen_application",
-                draft_language="en",
-                source_application_text=transcript_text,
+            audio_content = await self.document_ingestion.read_upload_bytes(audio_file)
+            saved_audio_path = await self.document_ingestion.save_upload(audio_file, content=audio_content)
+            saved_audio_media_type = audio_file.content_type or "audio/webm"
+            saved_audio_name = audio_file.filename or Path(saved_audio_path).name
+            transcript_text = self.extraction_service.clean_text(
+                await self.document_ingestion.extract_text(audio_file, content=audio_content)
             )
-            self._attach_saved_evidence(
-                response.fir_id,
-                audio_file.filename or Path(saved_path).name,
-                str(saved_path),
-                audio_file.content_type or "audio/webm",
-            )
-            return self.get_fir_record(response.fir_id)
         else:
             raise HTTPException(status_code=400, detail="Provide an audio file or transcript text.")
 
         structured = self.extraction_service.extract_from_text(transcript_text, defaults=defaults)
-        return self._persist_fir_record(
+        response = self._persist_fir_record(
             workflow="voice",
             structured=structured,
             transcript_text=transcript_text,
             user_id=user_id,
-            draft_role=payload.draft_role if payload else "citizen_application",
-            draft_language=payload.language if payload else "en",
+            draft_role=draft_role,
+            draft_language=draft_language,
             source_application_text=transcript_text,
         )
+        if saved_audio_path and saved_audio_name and saved_audio_media_type:
+            self._attach_saved_evidence(
+                response.fir_id,
+                saved_audio_name,
+                str(saved_audio_path),
+                saved_audio_media_type,
+            )
+        return self.get_fir_record(response.fir_id)
 
     async def preview_voice_processing(
         self,
         audio_file: UploadFile | None = None,
         payload: FIRVoiceTranscriptRequest | None = None,
     ) -> FIRVoiceProcessingResponse:
-        if payload:
-            transcript_text = self.extraction_service.clean_text(payload.transcript_text)
-            defaults = {
-                "police_station": payload.police_station,
-                "complainant_name": payload.complainant_name,
-            }
+        defaults = {
+            "police_station": payload.police_station if payload else None,
+            "complainant_name": payload.complainant_name if payload else None,
+        }
+        transcript_candidate = self.extraction_service.clean_text(payload.transcript_text) if payload else ""
+
+        if transcript_candidate:
+            transcript_text = transcript_candidate
         elif audio_file:
-            transcript_text = self.extraction_service.clean_text(await self.document_ingestion.extract_text(audio_file))
-            defaults = {}
+            audio_content = await self.document_ingestion.read_upload_bytes(audio_file)
+            transcript_text = self.extraction_service.clean_text(
+                await self.document_ingestion.extract_text(audio_file, content=audio_content)
+            )
         else:
             raise HTTPException(status_code=400, detail="Provide an audio file or transcript text.")
 
