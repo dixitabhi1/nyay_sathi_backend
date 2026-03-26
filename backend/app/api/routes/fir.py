@@ -38,7 +38,7 @@ def create_manual_fir(
     current_user: User | None = Depends(get_optional_current_user),
 ) -> FIRRecordResponse:
     payload.user_id = current_user.id if current_user else payload.user_id
-    response = fir_service.create_manual_fir(payload)
+    response = fir_service.create_manual_fir(payload, viewer=current_user)
     audit_service.log("fir.manual", payload.model_dump(), response.model_dump(), payload.user_id)
     return response
 
@@ -50,7 +50,7 @@ def preview_manual_fir(
     current_user: User | None = Depends(get_optional_current_user),
 ) -> FIRUploadIntakeResponse:
     payload.user_id = current_user.id if current_user else payload.user_id
-    return fir_service.preview_manual_fir(payload)
+    return fir_service.preview_manual_fir(payload, viewer=current_user)
 
 
 @router.post("/upload/preview", response_model=FIRUploadIntakeResponse)
@@ -60,12 +60,14 @@ async def preview_uploaded_complaint(
     draft_role: str = Form(default="citizen_application"),
     language: str = Form(default="en"),
     fir_service: FIRService = Depends(get_fir_service),
+    current_user: User | None = Depends(get_optional_current_user),
 ) -> FIRUploadIntakeResponse:
     return await fir_service.preview_uploaded_complaint(
         complaint_file,
         police_station,
         draft_role=draft_role,
         draft_language=language,
+        viewer=current_user,
     )
 
 
@@ -87,6 +89,7 @@ async def create_fir_from_upload(
         draft_role=draft_role,
         draft_language=language,
         user_id=user_id,
+        viewer=current_user,
     )
     audit_service.log(
         "fir.upload",
@@ -130,7 +133,7 @@ async def create_fir_from_voice(
             language=language,
             user_id=user_id,
         )
-    response = await fir_service.create_fir_from_voice(audio_file=audio_file, payload=payload)
+    response = await fir_service.create_fir_from_voice(audio_file=audio_file, payload=payload, viewer=current_user)
     audit_service.log(
         "fir.voice",
         {"filename": getattr(audio_file, "filename", None), "transcript_text": transcript_text},
@@ -170,7 +173,7 @@ async def preview_voice_processing(
             language=language,
             user_id=current_user.id if current_user else None,
         )
-    return await fir_service.preview_voice_processing(audio_file=audio_file, payload=payload)
+    return await fir_service.preview_voice_processing(audio_file=audio_file, payload=payload, viewer=current_user)
 
 
 @router.post("/sections/predict", response_model=list[FIRSectionSuggestion])
@@ -229,7 +232,7 @@ def get_fir_record(
     fir_service: FIRService = Depends(get_fir_service),
     current_user: User | None = Depends(get_optional_current_user),
 ) -> FIRRecordResponse:
-    return fir_service.get_fir_record(fir_id, user_id=current_user.id if current_user else None)
+    return fir_service.get_fir_record(fir_id, user_id=current_user.id if current_user else None, viewer=current_user)
 
 
 @router.put("/{fir_id}/draft", response_model=FIRRecordResponse)
@@ -241,7 +244,12 @@ def update_fir_draft(
     current_user: User | None = Depends(get_optional_current_user),
 ) -> FIRRecordResponse:
     payload.edited_by = current_user.id if current_user else payload.edited_by
-    response = fir_service.update_draft(fir_id, payload, user_id=current_user.id if current_user else None)
+    response = fir_service.update_draft(
+        fir_id,
+        payload,
+        user_id=current_user.id if current_user else None,
+        viewer=current_user,
+    )
     audit_service.log("fir.update_draft", payload.model_dump(), response.model_dump(), payload.edited_by)
     return response
 
@@ -252,7 +260,11 @@ def list_fir_versions(
     fir_service: FIRService = Depends(get_fir_service),
     current_user: User | None = Depends(get_optional_current_user),
 ) -> FIRVersionsResponse:
-    return fir_service.list_versions(fir_id, user_id=current_user.id if current_user else None)
+    return fir_service.list_versions(
+        fir_id,
+        user_id=current_user.id if current_user else None,
+        viewer=current_user,
+    )
 
 
 @router.get("/{fir_id}/intelligence", response_model=FIRIntelligenceResponse)
@@ -261,7 +273,11 @@ def fir_intelligence(
     fir_service: FIRService = Depends(get_fir_service),
     current_user: User | None = Depends(get_optional_current_user),
 ) -> FIRIntelligenceResponse:
-    return fir_service.intelligence_summary(fir_id, user_id=current_user.id if current_user else None)
+    return fir_service.intelligence_summary(
+        fir_id,
+        user_id=current_user.id if current_user else None,
+        viewer=current_user,
+    )
 
 
 @router.post("/{fir_id}/evidence", response_model=FIRRecordResponse)
@@ -272,7 +288,12 @@ async def upload_fir_evidence(
     audit_service: AuditService = Depends(get_audit_service),
     current_user: User | None = Depends(get_optional_current_user),
 ) -> FIRRecordResponse:
-    response = await fir_service.attach_evidence(fir_id, evidence_files, user_id=current_user.id if current_user else None)
+    response = await fir_service.attach_evidence(
+        fir_id,
+        evidence_files,
+        user_id=current_user.id if current_user else None,
+        viewer=current_user,
+    )
     audit_service.log(
         "fir.evidence",
         {"fir_id": fir_id, "files": [upload.filename for upload in evidence_files]},
@@ -294,6 +315,7 @@ def download_fir_document_pdf(
         document_kind=document_kind,
         user_id=current_user.id if current_user else None,
         language=language,
+        viewer=current_user,
     )
     return StreamingResponse(
         iter([pdf_bytes]),

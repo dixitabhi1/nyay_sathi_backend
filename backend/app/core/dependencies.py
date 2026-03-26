@@ -133,6 +133,7 @@ def get_history_service() -> UserHistoryService:
 def get_fir_service() -> FIRService:
     init_db()
     return FIRService(
+        settings=get_settings(),
         document_ingestion=get_document_ingestion_service(),
         extraction_service=get_fir_extraction_service(),
         classifier=get_legal_section_classifier(),

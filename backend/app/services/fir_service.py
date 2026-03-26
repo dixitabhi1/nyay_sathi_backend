@@ -7,7 +7,9 @@ from uuid import uuid4
 
 from fastapi import HTTPException, UploadFile
 
+from app.core.config import Settings
 from app.db.session import SessionLocal
+from app.models.auth import User
 from app.models.fir import FIREvidence, FIRIntelligence, FIRRecord, FIRVersion
 from app.schemas.fir import (
     AI_FIR_DISCLAIMER,
@@ -47,6 +49,7 @@ from app.services.legal_section_classifier import LegalSectionClassifier
 class FIRService:
     def __init__(
         self,
+        settings: Settings,
         document_ingestion: DocumentIngestionService,
         extraction_service: FIRExtractionService,
         classifier: LegalSectionClassifier,
@@ -56,6 +59,7 @@ class FIRService:
         evidence_intelligence: EvidenceIntelligenceService,
         crime_pattern_service: CrimePatternService,
     ) -> None:
+        self.settings = settings
         self.document_ingestion = document_ingestion
         self.extraction_service = extraction_service
         self.classifier = classifier
@@ -65,7 +69,8 @@ class FIRService:
         self.evidence_intelligence = evidence_intelligence
         self.crime_pattern_service = crime_pattern_service
 
-    def create_manual_fir(self, payload: FIRManualRequest) -> FIRRecordResponse:
+    def create_manual_fir(self, payload: FIRManualRequest, viewer: User | None = None) -> FIRRecordResponse:
+        self._ensure_document_kind_access(payload.draft_role, viewer)
         structured = FIRStructuredData(
             complainant_name=payload.complainant_name,
             parent_name=payload.parent_name,
@@ -88,9 +93,11 @@ class FIRService:
             draft_role=payload.draft_role,
             draft_language=payload.language,
             source_application_text=None,
+            viewer=viewer,
         )
 
-    def preview_manual_fir(self, payload: FIRManualRequest) -> FIRUploadIntakeResponse:
+    def preview_manual_fir(self, payload: FIRManualRequest, viewer: User | None = None) -> FIRUploadIntakeResponse:
+        self._ensure_document_kind_access(payload.draft_role, viewer)
         structured = FIRStructuredData(
             complainant_name=payload.complainant_name,
             parent_name=payload.parent_name,
@@ -116,7 +123,7 @@ class FIRService:
             language=payload.language,
             source_application_text=None,
         )
-        draft = self._select_document_content(documents, payload.draft_role)
+        _, draft, visible_documents = self._prepare_documents_for_viewer(documents, payload.draft_role, viewer)
         return FIRUploadIntakeResponse(
             extracted_data=structured,
             transcript_text=None,
@@ -129,7 +136,7 @@ class FIRService:
             case_strength_score=score,
             case_strength_reasoning=score_reasons,
             draft_text=draft,
-            generated_documents=documents,
+            generated_documents=visible_documents,
         )
 
     async def create_fir_from_upload(
@@ -139,7 +146,9 @@ class FIRService:
         draft_role: str = "citizen_application",
         draft_language: str = "en",
         user_id: str | None = None,
+        viewer: User | None = None,
     ) -> FIRRecordResponse:
+        self._ensure_document_kind_access(draft_role, viewer)
         content = await self.document_ingestion.read_upload_bytes(complaint_file)
         saved_path = await self.document_ingestion.save_upload(complaint_file, content=content)
         extracted_text = await self.document_ingestion.extract_text(complaint_file, content=content)
@@ -155,6 +164,7 @@ class FIRService:
             draft_role=draft_role,
             draft_language=draft_language,
             source_application_text=extracted_text,
+            viewer=viewer,
         )
         self._attach_saved_evidence(
             response.fir_id,
@@ -162,7 +172,7 @@ class FIRService:
             str(saved_path),
             complaint_file.content_type or "application/octet-stream",
         )
-        return self.get_fir_record(response.fir_id)
+        return self.get_fir_record(response.fir_id, user_id=user_id, viewer=viewer)
 
     async def preview_uploaded_complaint(
         self,
@@ -170,7 +180,9 @@ class FIRService:
         police_station: str | None = None,
         draft_role: str = "citizen_application",
         draft_language: str = "en",
+        viewer: User | None = None,
     ) -> FIRUploadIntakeResponse:
+        self._ensure_document_kind_access(draft_role, viewer)
         content = await self.document_ingestion.read_upload_bytes(complaint_file)
         extracted_text = await self.document_ingestion.extract_text(complaint_file, content=content)
         cleaned_text = self.extraction_service.clean_text(extracted_text)
@@ -186,7 +198,7 @@ class FIRService:
             language=draft_language,
             source_application_text=cleaned_text,
         )
-        draft = self._select_document_content(documents, draft_role)
+        _, draft, visible_documents = self._prepare_documents_for_viewer(documents, draft_role, viewer)
         return FIRUploadIntakeResponse(
             extracted_data=structured,
             transcript_text=None,
@@ -199,14 +211,17 @@ class FIRService:
             case_strength_score=score,
             case_strength_reasoning=score_reasons,
             draft_text=draft,
-            generated_documents=documents,
+            generated_documents=visible_documents,
         )
 
     async def create_fir_from_voice(
         self,
         audio_file: UploadFile | None = None,
         payload: FIRVoiceTranscriptRequest | None = None,
+        viewer: User | None = None,
     ) -> FIRRecordResponse:
+        requested_kind = payload.draft_role if payload else "citizen_application"
+        self._ensure_document_kind_access(requested_kind, viewer)
         defaults = {
             "police_station": payload.police_station if payload else None,
             "complainant_name": payload.complainant_name if payload else None,
@@ -247,6 +262,7 @@ class FIRService:
             draft_role=draft_role,
             draft_language=draft_language,
             source_application_text=transcript_text,
+            viewer=viewer,
         )
         if saved_audio_path and saved_audio_name and saved_audio_media_type:
             self._attach_saved_evidence(
@@ -255,13 +271,16 @@ class FIRService:
                 str(saved_audio_path),
                 saved_audio_media_type,
             )
-        return self.get_fir_record(response.fir_id)
+        return self.get_fir_record(response.fir_id, user_id=user_id, viewer=viewer)
 
     async def preview_voice_processing(
         self,
         audio_file: UploadFile | None = None,
         payload: FIRVoiceTranscriptRequest | None = None,
+        viewer: User | None = None,
     ) -> FIRVoiceProcessingResponse:
+        requested_kind = payload.draft_role if payload else "citizen_application"
+        self._ensure_document_kind_access(requested_kind, viewer)
         defaults = {
             "police_station": payload.police_station if payload else None,
             "complainant_name": payload.complainant_name if payload else None,
@@ -287,18 +306,19 @@ class FIRService:
             language=payload.language if payload else "en",
             source_application_text=transcript_text,
         )
+        _, _, visible_documents = self._prepare_documents_for_viewer(documents, requested_kind, viewer)
         return FIRVoiceProcessingResponse(
             transcript_text=transcript_text,
             cleaned_text=transcript_text,
             extracted_data=extracted,
             sections=sections,
             comparative_sections=comparative_sections,
-            generated_documents=documents,
+            generated_documents=visible_documents,
             jurisdiction=self.jurisdiction_service.suggest(extracted.incident_location),
             completeness=self.completeness_service.evaluate(extracted),
         )
 
-    def get_fir_record(self, fir_id: str, user_id: str | None = None) -> FIRRecordResponse:
+    def get_fir_record(self, fir_id: str, user_id: str | None = None, viewer: User | None = None) -> FIRRecordResponse:
         session = SessionLocal()
         try:
             record = session.get(FIRRecord, fir_id)
@@ -306,7 +326,7 @@ class FIRService:
                 raise HTTPException(status_code=404, detail="FIR record not found.")
             evidence_rows = session.query(FIREvidence).filter(FIREvidence.fir_id == fir_id).order_by(FIREvidence.id.asc()).all()
             intelligence = session.get(FIRIntelligence, fir_id)
-            return self._serialize_record(record, evidence_rows, intelligence)
+            return self._serialize_record(record, evidence_rows, intelligence, viewer=viewer)
         finally:
             session.close()
 
@@ -340,7 +360,14 @@ class FIRService:
         finally:
             session.close()
 
-    def update_draft(self, fir_id: str, payload: FIRDraftUpdateRequest, user_id: str | None = None) -> FIRRecordResponse:
+    def update_draft(
+        self,
+        fir_id: str,
+        payload: FIRDraftUpdateRequest,
+        user_id: str | None = None,
+        viewer: User | None = None,
+    ) -> FIRRecordResponse:
+        self._ensure_document_kind_access(payload.document_kind, viewer)
         session = SessionLocal()
         try:
             record = session.get(FIRRecord, fir_id)
@@ -372,17 +399,23 @@ class FIRService:
             session.commit()
             evidence_rows = session.query(FIREvidence).filter(FIREvidence.fir_id == fir_id).order_by(FIREvidence.id.asc()).all()
             intelligence = session.get(FIRIntelligence, fir_id)
-            return self._serialize_record(record, evidence_rows, intelligence)
+            return self._serialize_record(record, evidence_rows, intelligence, viewer=viewer)
         finally:
             session.close()
 
-    def list_versions(self, fir_id: str, user_id: str | None = None) -> FIRVersionsResponse:
+    def list_versions(
+        self,
+        fir_id: str,
+        user_id: str | None = None,
+        viewer: User | None = None,
+    ) -> FIRVersionsResponse:
         session = SessionLocal()
         try:
             record = session.get(FIRRecord, fir_id)
             if not record or (user_id and record.user_id and record.user_id != user_id):
                 raise HTTPException(status_code=404, detail="FIR record not found.")
             rows = session.query(FIRVersion).filter(FIRVersion.fir_id == fir_id).order_by(FIRVersion.version_number.asc()).all()
+            allowed_kinds = self._allowed_document_kinds_for_viewer(viewer)
             return FIRVersionsResponse(
                 fir_id=fir_id,
                 versions=[
@@ -396,13 +429,20 @@ class FIRService:
                         created_at=row.created_at.isoformat(),
                     )
                     for row in rows
+                    if row.document_kind in allowed_kinds
                 ],
             )
         finally:
             session.close()
 
-    async def attach_evidence(self, fir_id: str, files: list[UploadFile], user_id: str | None = None) -> FIRRecordResponse:
-        self.get_fir_record(fir_id, user_id=user_id)
+    async def attach_evidence(
+        self,
+        fir_id: str,
+        files: list[UploadFile],
+        user_id: str | None = None,
+        viewer: User | None = None,
+    ) -> FIRRecordResponse:
+        self.get_fir_record(fir_id, user_id=user_id, viewer=viewer)
         for upload in files:
             saved_path = await self.document_ingestion.save_upload(upload)
             self._attach_saved_evidence(
@@ -411,7 +451,7 @@ class FIRService:
                 str(saved_path),
                 upload.content_type or "application/octet-stream",
             )
-        return self.get_fir_record(fir_id, user_id=user_id)
+        return self.get_fir_record(fir_id, user_id=user_id, viewer=viewer)
 
     async def analyze_evidence(self, fir_id: str | None, files: list[UploadFile]) -> FIREvidenceAnalysisResponse:
         return await self.evidence_intelligence.analyze_uploads(files, fir_id)
@@ -429,8 +469,13 @@ class FIRService:
     def crime_patterns(self, window_days: int = 7) -> FIRCrimePatternResponse:
         return self.crime_pattern_service.get_patterns(window_days=window_days)
 
-    def intelligence_summary(self, fir_id: str, user_id: str | None = None) -> FIRIntelligenceResponse:
-        record = self.get_fir_record(fir_id, user_id=user_id)
+    def intelligence_summary(
+        self,
+        fir_id: str,
+        user_id: str | None = None,
+        viewer: User | None = None,
+    ) -> FIRIntelligenceResponse:
+        record = self.get_fir_record(fir_id, user_id=user_id, viewer=viewer)
         pattern = None
         if record.jurisdiction and record.jurisdiction.latitude is not None and record.jurisdiction.longitude is not None:
             nearby_count = self.crime_pattern_service.nearby_records(
@@ -457,8 +502,10 @@ class FIRService:
         document_kind: str,
         user_id: str | None = None,
         language: str | None = None,
+        viewer: User | None = None,
     ) -> tuple[str, bytes]:
-        record = self.get_fir_record(fir_id, user_id=user_id)
+        self._ensure_document_kind_access(document_kind, viewer)
+        record = self.get_fir_record(fir_id, user_id=user_id, viewer=viewer)
         target_kind = self._normalize_document_kind(document_kind)
         target_language = self._normalize_language(language or record.draft_language)
         document = next((item for item in record.generated_documents if item.kind == target_kind and item.language == target_language), None)
@@ -479,6 +526,7 @@ class FIRService:
         draft_role: str,
         draft_language: str,
         source_application_text: str | None,
+        viewer: User | None,
     ) -> FIRRecordResponse:
         sections, legal_reasoning = self.classifier.classify(structured.incident_description)
         comparative_sections = self.classifier.compare_sections(structured.incident_description, sections)
@@ -554,7 +602,7 @@ class FIRService:
             )
             session.commit()
             intelligence = session.get(FIRIntelligence, fir_id)
-            return self._serialize_record(record, [], intelligence)
+            return self._serialize_record(record, [], intelligence, viewer=viewer)
         finally:
             session.close()
 
@@ -576,6 +624,7 @@ class FIRService:
         record: FIRRecord,
         evidence_rows: list[FIREvidence],
         intelligence: FIRIntelligence | None,
+        viewer: User | None = None,
     ) -> FIRRecordResponse:
         extracted = FIRStructuredData.model_validate_json(record.extracted_payload)
         sections = [FIRSectionSuggestion.model_validate(item) for item in json.loads(record.suggested_sections)]
@@ -602,10 +651,16 @@ class FIRService:
                 ] or ["FIR contains the key details needed for preliminary review."],
             )
         )
+        visible_draft_role, visible_draft_text, visible_documents = self._prepare_documents_for_viewer(
+            self._serialize_documents(record),
+            record.draft_role,
+            viewer,
+            fallback_content=record.current_draft,
+        )
         return FIRRecordResponse(
             fir_id=record.id,
             workflow=record.workflow,
-            draft_role=record.draft_role,
+            draft_role=visible_draft_role,
             draft_language=record.draft_language,
             status=record.status,
             extracted_data=extracted,
@@ -614,8 +669,8 @@ class FIRService:
             sections=sections,
             comparative_sections=comparative_sections,
             legal_reasoning=record.legal_reasoning,
-            draft_text=record.current_draft,
-            generated_documents=self._serialize_documents(record),
+            draft_text=visible_draft_text,
+            generated_documents=visible_documents,
             jurisdiction=jurisdiction,
             completeness=completeness,
             case_strength_score=record.case_strength_score,
@@ -663,6 +718,50 @@ class FIRService:
                 )
             )
         return documents
+
+    def _prepare_documents_for_viewer(
+        self,
+        documents: list[FIRGeneratedDocument],
+        requested_kind: str,
+        viewer: User | None,
+        fallback_content: str | None = None,
+    ) -> tuple[str, str, list[FIRGeneratedDocument]]:
+        allowed_kinds = self._allowed_document_kinds_for_viewer(viewer)
+        visible_documents = [document for document in documents if document.kind in allowed_kinds]
+        if not visible_documents and documents:
+            fallback_document = next((document for document in documents if document.kind == "citizen_application"), documents[0])
+            visible_documents = [fallback_document]
+
+        normalized_requested = self._normalize_document_kind(requested_kind)
+        visible_default = next(
+            (document for document in visible_documents if document.kind == normalized_requested),
+            visible_documents[0] if visible_documents else None,
+        )
+        visible_kind = visible_default.kind if visible_default else normalized_requested
+        visible_text = visible_default.content if visible_default else (fallback_content or "")
+        return visible_kind, visible_text, visible_documents
+
+    def _allowed_document_kinds_for_viewer(self, viewer: User | None) -> set[str]:
+        if viewer and self._is_admin_viewer(viewer):
+            return {"citizen_application", "police_fir", "lawyer_analysis"}
+        if viewer and viewer.role == "police" and viewer.approval_status == "approved":
+            return {"police_fir"}
+        if viewer and viewer.role == "lawyer" and viewer.approval_status == "approved":
+            return {"lawyer_analysis"}
+        return {"citizen_application"}
+
+    def _ensure_document_kind_access(self, document_kind: str, viewer: User | None) -> None:
+        normalized = self._normalize_document_kind(document_kind)
+        if normalized not in self._allowed_document_kinds_for_viewer(viewer):
+            raise HTTPException(
+                status_code=403,
+                detail="You do not have access to this FIR document track.",
+            )
+
+    def _is_admin_viewer(self, viewer: User) -> bool:
+        return viewer.email.strip().lower() in self.settings.admin_email_allowlist or (
+            viewer.role == "admin" and viewer.approval_status == "approved"
+        )
 
     def _select_document_content(self, documents: list[FIRGeneratedDocument], draft_role: str) -> str:
         normalized = self._normalize_document_kind(draft_role)
