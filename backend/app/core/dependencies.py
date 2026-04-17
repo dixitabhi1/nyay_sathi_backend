@@ -15,6 +15,7 @@ from app.services.fir_service import FIRService
 from app.services.history import UserHistoryService
 from app.services.corpus_registry import CorpusRegistry
 from app.services.document_ingestion import DocumentIngestionService
+from app.services.document_marketplace import DocumentMarketplaceService
 from app.services.embeddings import EmbeddingService
 from app.services.inference import InferenceGateway
 from app.services.jurisdiction import JurisdictionService
@@ -55,6 +56,12 @@ def get_inference_gateway() -> InferenceGateway:
 @lru_cache
 def get_document_ingestion_service() -> DocumentIngestionService:
     return DocumentIngestionService(get_settings())
+
+
+@lru_cache
+def get_document_marketplace_service() -> DocumentMarketplaceService:
+    init_db()
+    return DocumentMarketplaceService(get_settings(), get_document_ingestion_service())
 
 
 @lru_cache

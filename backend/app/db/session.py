@@ -87,6 +87,7 @@ def get_db() -> Generator:
 def init_db() -> None:
     from app.models.audit import AuditLog
     from app.models.auth import AuthSession, User
+    from app.models.documents import DocumentOrder, DocumentTemplate
     from app.models.fir import FIREvidence, FIRIntelligence, FIRRecord, FIRVersion
     from app.models.lawyer import LawyerFollow, LawyerPost, LawyerPostLike, LawyerProfile, LawyerReview
     from app.models.messaging import DirectConversation, DirectMessage

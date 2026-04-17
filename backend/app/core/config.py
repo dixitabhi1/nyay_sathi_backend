@@ -131,6 +131,10 @@ class Settings(BaseSettings):
     fir_temperature: float = Field(default=0.15, alias="FIR_TEMPERATURE")
     fir_inference_timeout_seconds: float = Field(default=10.0, alias="FIR_INFERENCE_TIMEOUT_SECONDS")
 
+    payment_provider: str = Field(default="none", alias="PAYMENT_PROVIDER")
+    razorpay_key_id: str = Field(default="", alias="RAZORPAY_KEY_ID")
+    razorpay_key_secret: str = Field(default="", alias="RAZORPAY_KEY_SECRET")
+
     upload_dir: Path = Field(default=Path("storage/uploads"), alias="UPLOAD_DIR")
     ocr_language: str = Field(default="eng+hin", alias="OCR_LANGUAGE")
     whisper_model: str = Field(default="tiny", alias="WHISPER_MODEL")

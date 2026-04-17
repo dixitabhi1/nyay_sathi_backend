@@ -16,6 +16,9 @@ ACTION_CATEGORY_MAP = {
     "analysis.fir": "analysis",
     "documents.contract": "documents",
     "documents.evidence": "documents",
+    "documents.template_publish": "drafting",
+    "documents.template_checkout": "drafting",
+    "documents.template_verify_payment": "drafting",
     "fir.manual": "fir",
     "fir.upload": "fir",
     "fir.voice": "fir",
@@ -77,6 +80,12 @@ class UserHistoryService:
             return f"Draft: {input_payload.get('draft_type', 'document')}"[:80]
         if action in {"documents.contract", "documents.evidence"}:
             return f"{action.split('.')[1].title()} analysis"
+        if action == "documents.template_publish":
+            return f"Published: {input_payload.get('title', 'Document template')}"[:80]
+        if action == "documents.template_checkout":
+            return f"Document order #{output_payload.get('order', {}).get('id', '')}".strip()
+        if action == "documents.template_verify_payment":
+            return f"Unlocked document order #{input_payload.get('order_id', '')}".strip()
         if action.startswith("fir."):
             fir_id = output_payload.get("fir_id") or input_payload.get("fir_id")
             return f"FIR {action.split('.')[1].replace('_', ' ').title()}" + (f" ({fir_id})" if fir_id else "")
@@ -87,6 +96,10 @@ class UserHistoryService:
             value = input_payload.get(key)
             if value:
                 return str(value)[:200]
+        if action == "documents.template_checkout":
+            answers = input_payload.get("answers")
+            if answers:
+                return json.dumps(answers, ensure_ascii=True)[:200]
         return None
 
     def _result_excerpt(self, action: str, output_payload: dict) -> str | None:
@@ -94,4 +107,9 @@ class UserHistoryService:
             value = output_payload.get(key)
             if value:
                 return str(value)[:200]
+        if action.startswith("documents.template_"):
+            order = output_payload.get("order", output_payload)
+            generated = order.get("generated_document_text")
+            if generated:
+                return str(generated)[:200]
         return None
