@@ -12,6 +12,7 @@ ROOT_DIR = Path(__file__).resolve().parents[3]
 SPACE_BOOTSTRAP_ADMIN_EMAILS = {
     "abhishek1530002@gmail.com",
 }
+HF_PERSISTENT_STORAGE_ROOT = Path("/data/nyayasetu")
 
 
 def resolve_repo_path(path: Path) -> Path:
@@ -45,6 +46,12 @@ def normalize_turso_database_url(raw_url: str) -> str:
     return candidate
 
 
+def default_space_storage_root() -> Path:
+    if os.name == "nt":
+        return ROOT_DIR / "storage" / "space"
+    return HF_PERSISTENT_STORAGE_ROOT
+
+
 def _with_turso_remote_params(database_url: str) -> str:
     parsed = urlparse(database_url)
     if not parsed.netloc:
@@ -69,8 +76,10 @@ class Settings(BaseSettings):
     auth_token_ttl_hours: int = Field(default=24, alias="AUTH_TOKEN_TTL_HOURS")
     admin_emails: str = Field(default="", alias="ADMIN_EMAILS")
     database_probe_timeout_seconds: float = Field(default=4.0, alias="DATABASE_PROBE_TIMEOUT_SECONDS")
-    prefer_local_app_db_on_space: bool = Field(default=True, alias="PREFER_LOCAL_APP_DB_ON_SPACE")
+    prefer_local_app_db_on_space: bool = Field(default=False, alias="PREFER_LOCAL_APP_DB_ON_SPACE")
     persistent_storage_root: Path | None = Field(default=None, alias="PERSISTENT_STORAGE_ROOT")
+    bootstrap_admin_password: str = Field(default="", alias="BOOTSTRAP_ADMIN_PASSWORD")
+    bootstrap_admin_full_name: str = Field(default="NyayaSetu Admin", alias="BOOTSTRAP_ADMIN_FULL_NAME")
 
     app_sqlite_path: Path = Field(default=Path("storage/db/nyayasetu.sqlite3"), alias="APP_SQLITE_PATH")
     database_url: str | None = Field(default=None, alias="DATABASE_URL")
@@ -174,6 +183,8 @@ class Settings(BaseSettings):
 @lru_cache
 def get_settings() -> Settings:
     settings = Settings()
+    if settings.is_huggingface_space and not settings.persistent_storage_root:
+        settings.persistent_storage_root = default_space_storage_root()
     settings.persistent_storage_root = (
         settings.persistent_storage_root if settings.persistent_storage_root and settings.persistent_storage_root.is_absolute()
         else resolve_repo_path(settings.persistent_storage_root) if settings.persistent_storage_root

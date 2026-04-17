@@ -11,6 +11,7 @@ from app.core.config import ROOT_DIR, get_settings
 from app.core.dependencies import get_retriever
 from app.db.analytics import init_analytics_db
 from app.db.session import init_db
+from app.services.auth import AuthService
 
 
 logger = logging.getLogger(__name__)
@@ -26,6 +27,7 @@ def _warm_retriever_in_background() -> None:
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     init_db()
+    AuthService(get_settings()).ensure_allowlisted_admin_accounts()
     init_analytics_db()
     threading.Thread(target=_warm_retriever_in_background, daemon=True).start()
     yield

@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 import hashlib
 import hmac
+import logging
 import secrets
 import uuid
 
@@ -24,6 +25,7 @@ from app.schemas.auth import (
 
 APPROVAL_REQUIRED_ROLES = {"lawyer", "police"}
 DIRECT_ACCESS_ROLES = {"citizen", "admin"}
+logger = logging.getLogger(__name__)
 
 
 @dataclass(slots=True)
@@ -90,6 +92,63 @@ class AuthService:
             session.commit()
             session.refresh(user)
             return self._issue_session(session, user, user_agent, ip_address)
+        finally:
+            session.close()
+
+    def ensure_allowlisted_admin_accounts(self) -> None:
+        allowlisted_emails = sorted(self.settings.admin_email_allowlist)
+        if not allowlisted_emails:
+            return
+
+        session = SessionLocal()
+        try:
+            for email in allowlisted_emails:
+                user = session.query(User).filter(User.email == email).first()
+                if user is None:
+                    if not self.settings.bootstrap_admin_password:
+                        logger.warning(
+                            "Allowlisted admin email %s is missing and BOOTSTRAP_ADMIN_PASSWORD is not configured.",
+                            email,
+                        )
+                        continue
+                    session.add(
+                        User(
+                            id=uuid.uuid4().hex,
+                            email=email,
+                            full_name=self.settings.bootstrap_admin_full_name.strip() or "NyayaSetu Admin",
+                            role="admin",
+                            requested_role="admin",
+                            approval_status="approved",
+                            preferred_language="en",
+                            approval_notes="Bootstrap admin account restored automatically on startup.",
+                            approval_updated_at=datetime.utcnow(),
+                            password_hash=self._hash_password(self.settings.bootstrap_admin_password),
+                            is_active=True,
+                        )
+                    )
+                    logger.info("Bootstrapped missing admin account for %s.", email)
+                    continue
+
+                changed = False
+                if user.role != "admin":
+                    user.role = "admin"
+                    changed = True
+                if user.requested_role != "admin":
+                    user.requested_role = "admin"
+                    changed = True
+                if user.approval_status != "approved":
+                    user.approval_status = "approved"
+                    changed = True
+                if not user.is_active:
+                    user.is_active = True
+                    changed = True
+                if changed:
+                    user.approval_notes = "Admin account synchronized automatically from the operator allowlist."
+                    user.approval_updated_at = datetime.utcnow()
+                    user.updated_at = datetime.utcnow()
+                    session.add(user)
+
+            session.commit()
         finally:
             session.close()
 
