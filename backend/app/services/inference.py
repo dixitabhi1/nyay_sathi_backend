@@ -52,7 +52,13 @@ class InferenceGateway:
         )
         with httpx.Client(timeout=timeout) as client:
             response = client.post(f"{self.settings.inference_base_url.rstrip('/')}/chat/completions", json=payload)
-            response.raise_for_status()
+            if not response.is_success:
+                raise RuntimeError(self._format_upstream_error(response, "text generation"))
+            if "application/json" not in response.headers.get("content-type", "").lower():
+                raise RuntimeError(
+                    "Text generation endpoint returned non-JSON content. "
+                    "Check INFERENCE_PROVIDER and INFERENCE_BASE_URL; the URL should be an OpenAI-compatible API endpoint, not a Hugging Face model page."
+                )
             data = response.json()
         return data["choices"][0]["message"]["content"]
 
@@ -86,9 +92,18 @@ class InferenceGateway:
         )
         with httpx.Client(timeout=timeout) as client:
             response = client.post(f"{self.settings.ollama_base_url.rstrip('/')}/api/chat", json=payload)
-            response.raise_for_status()
+            if not response.is_success:
+                raise RuntimeError(self._format_upstream_error(response, "Ollama generation"))
+            if "application/json" not in response.headers.get("content-type", "").lower():
+                raise RuntimeError("Ollama endpoint returned non-JSON content. Check OLLAMA_BASE_URL.")
             data = response.json()
         return data["message"]["content"]
+
+    def _format_upstream_error(self, response: httpx.Response, context: str) -> str:
+        text = response.text[:500]
+        if "<!doctype html" in text.lower() or "<html" in text.lower():
+            text = "HTML page returned instead of API JSON."
+        return f"{context} failed with HTTP {response.status_code}: {text}"
 
     def _mock_response(self, prompt: str) -> str:
         preview = prompt[:700]

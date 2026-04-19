@@ -30,7 +30,21 @@ type CaseAnalysisResponse = {
 
 type ResearchResponse = {
   summary: string;
+  message?: string | null;
+  results?: ResearchCaseResult[];
   hits: SourceDocument[];
+};
+
+type ResearchCaseResult = {
+  case_title: string;
+  court: string;
+  similarity_score: string;
+  parties: string;
+  fir_summary: string;
+  charges: string;
+  verdict: string;
+  source_link: string;
+  comparison_reasoning: string;
 };
 
 type DraftResponse = {
@@ -146,14 +160,19 @@ function buildDownloadText(module: ModuleKey, content: unknown): string {
 
   if (module === "research") {
     const item = content as ResearchResponse;
+    const cases = Array.isArray(item.results) ? item.results : [];
     return [
       "NyayaSetu Research Preview",
       "",
       item.summary,
+      item.message ? `Note: ${item.message}` : "",
+      "",
+      "Similar cases:",
+      ...cases.map((result) => `- ${result.case_title} (${result.court}, ${result.similarity_score}): ${result.verdict} ${result.source_link}`),
       "",
       "Retrieved sources:",
       ...asSources(item.hits).map((hit) => `- ${hit.citation}: ${hit.excerpt}`),
-    ].join("\n");
+    ].filter(Boolean).join("\n");
   }
 
   if (module === "draft") {
@@ -352,6 +371,7 @@ function renderBody(module: ModuleKey, content: unknown) {
 
   if (module === "research") {
     const item = content as ResearchResponse;
+    const cases = Array.isArray(item.results) ? item.results : [];
     return (
       <>
         <section className="preview-section">
@@ -360,7 +380,36 @@ function renderBody(module: ModuleKey, content: unknown) {
             <span className="mini-pill">Semantic retrieval</span>
           </div>
           <p>{item.summary}</p>
+          {item.message ? <p className="muted-text">{item.message}</p> : null}
         </section>
+        {cases.length > 0 ? (
+          <section className="preview-section">
+            <h3>Similar verified cases</h3>
+            <div className="source-list">
+              {cases.map((result) => (
+                <article className="source-card" key={`${result.case_title}-${result.source_link}`}>
+                  <div className="section-heading-row">
+                    <h4>{result.case_title}</h4>
+                    <span className="mini-pill">{result.similarity_score}</span>
+                  </div>
+                  <p className="muted-text">{result.court}</p>
+                  <p>{result.fir_summary}</p>
+                  <p>
+                    <strong>Verdict:</strong> {result.verdict || "Not available in retrieved metadata"}
+                  </p>
+                  <p>
+                    <strong>Reasoning:</strong> {result.comparison_reasoning}
+                  </p>
+                  {result.source_link ? (
+                    <a href={result.source_link} target="_blank" rel="noreferrer">
+                      Open source
+                    </a>
+                  ) : null}
+                </article>
+              ))}
+            </div>
+          </section>
+        ) : null}
         {renderSources("Relevant statutes and judgments", asSources(item.hits))}
       </>
     );

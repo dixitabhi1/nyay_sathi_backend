@@ -51,10 +51,18 @@ async function requestBlob(path: string): Promise<Blob> {
 
 async function extractError(response: Response): Promise<string> {
   try {
-    const payload = (await response.json()) as { detail?: string };
-    return payload.detail ?? `API request failed with status ${response.status}`;
+    const payload = (await response.clone().json()) as { detail?: string };
+    const detail = payload.detail ?? "";
+    if (/<!doctype html|<html/i.test(detail)) {
+      return "Backend received an HTML page instead of JSON. Check the deployed API / inference URL configuration.";
+    }
+    return detail || `API request failed with status ${response.status}`;
   } catch {
-    return `API request failed with status ${response.status}`;
+    const text = await response.text().catch(() => "");
+    if (/<!doctype html|<html/i.test(text)) {
+      return "Backend returned HTML instead of JSON. The frontend may be pointed at the wrong backend URL.";
+    }
+    return text || `API request failed with status ${response.status}`;
   }
 }
 

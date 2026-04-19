@@ -35,5 +35,6 @@ def load_legal_corpus_records(settings: Settings, corpus_path: Path | None = Non
 def _supplemental_paths(settings: Settings) -> list[Path]:
     supplemental = [
         settings.legal_corpus_path.parent / "legal_supplemental_corpus.jsonl",
+        settings.legal_corpus_path.parent / "legal_case_law_corpus.jsonl",
     ]
     return [path for path in supplemental if path.exists()]

@@ -129,7 +129,13 @@ class FIRGenerationService:
             }
             with httpx.Client(timeout=timeout) as client:
                 response = client.post(f"{self.settings.fir_inference_base_url.rstrip('/')}/chat/completions", json=payload)
-                response.raise_for_status()
+                if not response.is_success:
+                    raise RuntimeError(self._format_upstream_error(response, "FIR generation"))
+                if "application/json" not in response.headers.get("content-type", "").lower():
+                    raise RuntimeError(
+                        "FIR generation endpoint returned non-JSON content. "
+                        "Check FIR_INFERENCE_PROVIDER and FIR_INFERENCE_BASE_URL; the URL should be an API endpoint."
+                    )
                 data = response.json()
             return data["choices"][0]["message"]["content"]
         if provider == "ollama":
@@ -144,7 +150,10 @@ class FIRGenerationService:
             }
             with httpx.Client(timeout=timeout) as client:
                 response = client.post(f"{self.settings.ollama_base_url.rstrip('/')}/api/chat", json=payload)
-                response.raise_for_status()
+                if not response.is_success:
+                    raise RuntimeError(self._format_upstream_error(response, "FIR Ollama generation"))
+                if "application/json" not in response.headers.get("content-type", "").lower():
+                    raise RuntimeError("Ollama endpoint returned non-JSON content. Check OLLAMA_BASE_URL.")
                 data = response.json()
             return data["message"]["content"]
         if provider == "local_pipeline":
@@ -156,6 +165,12 @@ class FIRGenerationService:
             )
             return outputs[0]["generated_text"].split("Assistant:", 1)[-1].strip()
         raise ValueError(f"Unsupported FIR inference provider: {self.settings.fir_inference_provider}")
+
+    def _format_upstream_error(self, response: httpx.Response, context: str) -> str:
+        text = response.text[:500]
+        if "<!doctype html" in text.lower() or "<html" in text.lower():
+            text = "HTML page returned instead of API JSON."
+        return f"{context} failed with HTTP {response.status_code}: {text}"
 
     @cached_property
     def local_pipeline(self):

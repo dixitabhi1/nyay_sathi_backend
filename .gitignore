@@ -24,6 +24,7 @@ storage/uploads/*
 data/index/*
 !data/index/legal.index
 !data/index/legal_metadata.json
+!data/index/legal_page_index.json
 frontend/.vite/
 frontend/dist/
 backend/.coverage

@@ -16,6 +16,7 @@ class SourceDocument(BaseModel):
     reference_path: str | None = None
     retrieval_mode: str | None = None
     confidence: float | None = None
+    metadata: dict[str, str] = Field(default_factory=dict)
 
 
 class ChatRequest(BaseModel):

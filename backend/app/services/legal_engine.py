@@ -336,7 +336,9 @@ class LegalEngine:
 
     def research(self, payload: ResearchRequest) -> ResearchResponse:
         query = payload.effective_query
-        hits = self._retrieve_sources(self._boost_legal_query(query), payload.top_k)
+        retrieval_k = max(payload.top_k, 80) if payload.mode == "case_search" else payload.top_k
+        hits = self._retrieve_sources(self._boost_legal_query(query), retrieval_k)
+        display_hits = hits[: payload.top_k]
         summary = "Hybrid retrieval combined semantic RAG hits with PageIndex section navigation for this legal research query."
 
         if payload.mode == "fir_analysis" and payload.user_role != "premium":
@@ -351,7 +353,7 @@ class LegalEngine:
                 ),
                 message="Upgrade required to access FIR intelligence features.",
                 summary=summary,
-                hits=hits,
+                hits=display_hits,
             )
 
         if payload.mode == "fir_analysis":
@@ -363,7 +365,7 @@ class LegalEngine:
                 fir_analysis=fir_analysis,
                 message="FIR intelligence generated from grounded statute retrieval and saved FIR comparisons.",
                 summary=summary,
-                hits=hits,
+                hits=display_hits,
             )
 
         case_results = self._build_case_search_results(hits)
@@ -380,7 +382,7 @@ class LegalEngine:
             fir_analysis=ResearchFIRAnalysis(),
             message=message,
             summary=summary,
-            hits=hits,
+            hits=display_hits,
         )
 
     async def analyze_contract(
@@ -460,9 +462,34 @@ class LegalEngine:
                 reference_path=item.get("reference_path"),
                 retrieval_mode=item.get("retrieval_mode"),
                 confidence=round(float(item.get("confidence", item.get("score", 0.0))), 4) if item.get("score") is not None else None,
+                metadata=self._source_metadata(item),
             )
             for item in hits
         ]
+
+    def _source_metadata(self, item: dict) -> dict[str, str]:
+        metadata: dict[str, str] = {}
+        raw_metadata = item.get("metadata")
+        if isinstance(raw_metadata, dict):
+            metadata.update({str(key): str(value) for key, value in raw_metadata.items() if value is not None})
+        for key in (
+            "case_title",
+            "court",
+            "parties",
+            "decision_date",
+            "case_number",
+            "verdict",
+            "bench",
+            "cnr",
+            "dataset",
+            "dataset_registry",
+            "source_pdf",
+            "accessed_on",
+        ):
+            value = item.get(key)
+            if value is not None and str(value).strip():
+                metadata[key] = str(value).strip()
+        return metadata
 
     def _format_sources_for_prompt(self, sources: list[SourceDocument]) -> str:
         formatted: list[str] = []
@@ -476,6 +503,7 @@ class LegalEngine:
                         f"Type: {source.source_type}",
                         f"Retrieval mode: {source.retrieval_mode or 'semantic'}",
                         f"Confidence: {source.confidence if source.confidence is not None else source.score}",
+                        f"Metadata: {source.metadata}" if source.metadata else "",
                         f"Excerpt: {source.excerpt}",
                         f"URL: {source.source_url or 'Unavailable'}",
                     ]
@@ -1158,20 +1186,37 @@ class LegalEngine:
         for source in sources:
             if source.source_type not in {"judgment", "case_law", "precedent"}:
                 continue
-            court = "Supreme Court" if "sci.gov.in" in (source.source_url or "") else "High Court"
+            metadata = source.metadata or {}
+            court = metadata.get("court") or (
+                "Supreme Court of India"
+                if "supreme-court" in (source.source_url or "") or "sci.gov.in" in (source.source_url or "")
+                else "High Court of India"
+            )
+            verdict = metadata.get("verdict") or self._plain_language_summary(source)
+            parties = metadata.get("parties") or metadata.get("case_title") or source.title
+            comparison_reason = "; ".join(
+                part
+                for part in [
+                    f"Decision date: {metadata.get('decision_date')}" if metadata.get("decision_date") else "",
+                    f"Case no.: {metadata.get('case_number')}" if metadata.get("case_number") else "",
+                    f"Dataset: {metadata.get('dataset')}" if metadata.get("dataset") else "",
+                    source.reference_path or source.citation,
+                ]
+                if part
+            )
             cases.append(
                 SimilarCaseReference(
-                    case_title=source.title,
+                    case_title=metadata.get("case_title") or source.title,
                     court=court,
-                    verdict=self._plain_language_summary(source),
+                    verdict=verdict,
                     source_link=source.source_url or "",
                     similarity_score=f"{round(source.score * 100, 1)}%",
-                    parties=source.title,
+                    parties=parties,
                     fir_summary=source.excerpt[:220],
                     charges=source.citation,
-                    comparison_reasoning=source.reference_path or source.citation,
+                    comparison_reasoning=comparison_reason,
                     relevance=source.excerpt[:220],
-                    relevance_reason=source.reference_path or source.citation,
+                    relevance_reason=comparison_reason,
                 )
             )
         return cases[:5]
@@ -1181,18 +1226,35 @@ class LegalEngine:
         for source in hits:
             if source.source_type not in {"judgment", "case_law", "precedent"}:
                 continue
-            court = "Supreme Court of India" if "sci.gov.in" in (source.source_url or "") else "High Court of India"
+            metadata = source.metadata or {}
+            court = metadata.get("court") or (
+                "Supreme Court of India"
+                if "supreme-court" in (source.source_url or "") or "sci.gov.in" in (source.source_url or "")
+                else "High Court of India"
+            )
+            verdict = metadata.get("verdict") or self._plain_language_summary(source)
+            parties = metadata.get("parties") or metadata.get("case_title") or source.title
+            comparison_reason = "; ".join(
+                part
+                for part in [
+                    f"Decision date: {metadata.get('decision_date')}" if metadata.get("decision_date") else "",
+                    f"Case no.: {metadata.get('case_number')}" if metadata.get("case_number") else "",
+                    f"Dataset: {metadata.get('dataset')}" if metadata.get("dataset") else "",
+                    source.reference_path or source.citation,
+                ]
+                if part
+            )
             results.append(
                 ResearchCaseResult(
-                    case_title=source.title,
+                    case_title=metadata.get("case_title") or source.title,
                     court=court,
                     similarity_score=f"{round(source.score * 100, 1)}%",
-                    parties=source.title,
+                    parties=parties,
                     fir_summary=source.excerpt[:220],
                     charges=source.citation,
-                    verdict=self._plain_language_summary(source),
+                    verdict=verdict,
                     source_link=source.source_url or "",
-                    comparison_reasoning=source.reference_path or source.citation,
+                    comparison_reasoning=comparison_reason,
                 )
             )
         return results[:10]
