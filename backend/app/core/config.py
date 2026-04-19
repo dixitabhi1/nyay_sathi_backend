@@ -146,6 +146,7 @@ class Settings(BaseSettings):
     hybrid_page_index_weight: float = Field(default=0.35, alias="HYBRID_PAGE_INDEX_WEIGHT")
     hybrid_cross_signal_bonus: float = Field(default=0.08, alias="HYBRID_CROSS_SIGNAL_BONUS")
     hybrid_exact_reference_bonus: float = Field(default=0.12, alias="HYBRID_EXACT_REFERENCE_BONUS")
+    warm_retrieval_on_startup: bool = Field(default=False, alias="WARM_RETRIEVAL_ON_STARTUP")
 
     inference_provider: str = Field(default="mock", alias="INFERENCE_PROVIDER")
     inference_base_url: str = Field(default="http://localhost:8000/v1", alias="INFERENCE_BASE_URL")

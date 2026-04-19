@@ -26,10 +26,12 @@ def _warm_retriever_in_background() -> None:
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
+    settings = get_settings()
     init_db()
-    AuthService(get_settings()).ensure_allowlisted_admin_accounts()
+    AuthService(settings).ensure_allowlisted_admin_accounts()
     init_analytics_db()
-    threading.Thread(target=_warm_retriever_in_background, daemon=True).start()
+    if settings.warm_retrieval_on_startup:
+        threading.Thread(target=_warm_retriever_in_background, daemon=True).start()
     yield
 
 

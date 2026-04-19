@@ -90,12 +90,10 @@ class Retriever:
         self._ensure_remote_index_artifacts(force=False)
         if self.vector_store.exists() and self.page_index.exists():
             if not self._index_missing_case_law_corpus():
-                self._warmup_embeddings()
                 return
             if self._ensure_remote_index_artifacts(force=True):
                 self._case_law_index_checked = False
                 if not self._index_missing_case_law_corpus():
-                    self._warmup_embeddings()
                     return
             force_rebuild = True
 
@@ -109,7 +107,6 @@ class Retriever:
         if force_rebuild or not self.page_index.exists():
             self.page_index.build(documents)
         self._case_law_index_checked = True
-        self._warmup_embeddings()
 
     def _ensure_remote_index_artifacts(self, force: bool) -> bool:
         targets = [
@@ -159,24 +156,34 @@ class Retriever:
             return False
         try:
             if self.vector_store.metadata:
-                metadata = self.vector_store.metadata
+                missing = not any(
+                    item.get("source_id") in {"indian_supreme_court_judgments_aws", "indian_high_court_judgments_aws"}
+                    for item in self.vector_store.metadata
+                    if isinstance(item, dict)
+                )
             else:
-                with self.vector_store.metadata_path.open("r", encoding="utf-8") as handle:
-                    metadata = json.load(handle)
+                missing = not self._metadata_file_contains_case_law()
         except Exception:
             return True
-        missing = not any(
-            item.get("source_id") in {"indian_supreme_court_judgments_aws", "indian_high_court_judgments_aws"}
-            for item in metadata
-            if isinstance(item, dict)
-        )
         if not missing:
             self._case_law_index_checked = True
         return missing
 
+    def _metadata_file_contains_case_law(self) -> bool:
+        needles = (b"indian_supreme_court_judgments_aws", b"indian_high_court_judgments_aws")
+        tail = b""
+        with self.vector_store.metadata_path.open("rb") as handle:
+            while True:
+                chunk = handle.read(1024 * 1024)
+                if not chunk:
+                    return False
+                haystack = tail + chunk
+                if any(needle in haystack for needle in needles):
+                    return True
+                tail = haystack[-64:]
+
     def ensure_ready(self) -> None:
-        if not self.vector_store.exists() or not self.page_index.exists():
-            self.ensure_index()
+        self.ensure_index()
 
     def search(self, query: str, top_k: int | None = None) -> list[dict]:
         self.ensure_ready()
@@ -186,11 +193,12 @@ class Retriever:
         cached = self._cache_get(self._search_cache, cache_key)
         if cached is not None:
             return [dict(item) for item in cached]
-        exact_hits = self.lookup_exact_reference(normalized_query, requested_top_k)
-        if exact_hits and self._is_exact_reference_query(normalized_query):
+        if self._is_exact_reference_query(normalized_query):
+            exact_hits = self.page_index.lookup_exact_reference(normalized_query, requested_top_k)
             final_hits = self._filter_grounded_hits(exact_hits)[:requested_top_k]
-            self._cache_set(self._search_cache, cache_key, final_hits, self.settings.retrieval_result_cache_size)
-            return [dict(item) for item in final_hits]
+            if final_hits:
+                self._cache_set(self._search_cache, cache_key, final_hits, self.settings.retrieval_result_cache_size)
+                return [dict(item) for item in final_hits]
         query_parts = self._expand_query_parts(self._decompose_query(normalized_query))
         semantic_hits = self._search_semantic_queries(query_parts, requested_top_k)
         structural_hits = (
@@ -211,6 +219,8 @@ class Retriever:
     def warm_indexes(self) -> None:
         self.ensure_index()
         self.vector_store.load()
+        if self.page_index.exists():
+            self.page_index.load()
         _ = self.embeddings.legal_scope_anchor_embeddings
 
     def _should_use_page_index(self, query_parts: list[str], top_k: int) -> bool:
