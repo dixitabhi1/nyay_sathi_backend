@@ -9,7 +9,6 @@ from fastapi.staticfiles import StaticFiles
 from app.api.router import api_router
 from app.core.config import ROOT_DIR, get_settings
 from app.core.dependencies import get_retriever
-from app.db.analytics import init_analytics_db
 from app.db.session import init_db
 from app.services.auth import AuthService
 
@@ -29,7 +28,6 @@ async def lifespan(_: FastAPI):
     settings = get_settings()
     init_db()
     AuthService(settings).ensure_allowlisted_admin_accounts()
-    init_analytics_db()
     if settings.warm_retrieval_on_startup:
         threading.Thread(target=_warm_retriever_in_background, daemon=True).start()
     yield

@@ -108,7 +108,7 @@ class Settings(BaseSettings):
     auth_token_ttl_hours: int = Field(default=24, alias="AUTH_TOKEN_TTL_HOURS")
     auth_password_hash_iterations: int | None = Field(default=None, alias="AUTH_PASSWORD_HASH_ITERATIONS")
     admin_emails: str = Field(default="", alias="ADMIN_EMAILS")
-    database_probe_timeout_seconds: float = Field(default=4.0, alias="DATABASE_PROBE_TIMEOUT_SECONDS")
+    database_probe_timeout_seconds: float = Field(default=1.5, alias="DATABASE_PROBE_TIMEOUT_SECONDS")
     prefer_local_app_db_on_space: bool = Field(default=True, alias="PREFER_LOCAL_APP_DB_ON_SPACE")
     allow_remote_app_db_on_space: bool = Field(default=False, alias="ALLOW_REMOTE_APP_DB_ON_SPACE")
     persistent_storage_root: Path | None = Field(default=None, alias="PERSISTENT_STORAGE_ROOT")
@@ -237,8 +237,8 @@ class Settings(BaseSettings):
     @property
     def resolved_auth_password_hash_iterations(self) -> int:
         if self.is_huggingface_space:
-            configured = int(self.auth_password_hash_iterations) if self.auth_password_hash_iterations is not None else 60_000
-            return min(60_000, max(20_000, configured))
+            configured = int(self.auth_password_hash_iterations) if self.auth_password_hash_iterations is not None else 24_000
+            return min(36_000, max(12_000, configured))
         if self.auth_password_hash_iterations is not None:
             return max(50_000, int(self.auth_password_hash_iterations))
         return 240_000
