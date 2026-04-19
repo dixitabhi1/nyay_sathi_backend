@@ -11,7 +11,7 @@ import uuid
 from fastapi import HTTPException, status
 
 from app.core.config import Settings
-from app.db.session import SessionLocal
+from app.db.session import SessionLocal, engine
 from app.models.auth import AuthSession, User
 from app.models.lawyer import LawyerProfile
 from app.schemas.auth import (
@@ -32,6 +32,28 @@ logger = logging.getLogger(__name__)
 class AuthenticatedSession:
     user: User
     session: AuthSession
+
+
+def get_missing_user_login_detail(
+    *,
+    is_huggingface_space: bool,
+    resolved_database_url: str,
+    engine_drivername: str,
+    space_local_app_db_fallback_reason: str | None,
+) -> str:
+    if not resolved_database_url.startswith("sqlite+libsql://") or engine_drivername == "sqlite+libsql":
+        return "Invalid email or password."
+
+    if is_huggingface_space and space_local_app_db_fallback_reason:
+        return (
+            "This deployment is currently using its local auth database instead of the configured remote database. "
+            "If your account was created on another deployment, register again or migrate users into the active DB."
+        )
+
+    return (
+        "The configured auth database is currently unavailable, and this deployment is using a fallback local database. "
+        "Existing accounts on the primary database may be temporarily unavailable."
+    )
 
 
 class AuthService:
@@ -163,7 +185,17 @@ class AuthService:
         session = SessionLocal()
         try:
             user = session.query(User).filter(User.email == normalized_email).first()
-            if not user or not self._verify_password(password, user.password_hash):
+            if not user:
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail=get_missing_user_login_detail(
+                        is_huggingface_space=self.settings.is_huggingface_space,
+                        resolved_database_url=self.settings.resolved_database_url,
+                        engine_drivername=engine.url.drivername,
+                        space_local_app_db_fallback_reason=self.settings.space_local_app_db_fallback_reason,
+                    ),
+                )
+            if not self._verify_password(password, user.password_hash):
                 raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid email or password.")
             if not user.is_active:
                 raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="This account is inactive.")

@@ -79,6 +79,22 @@ def _with_turso_remote_params(database_url: str) -> str:
     return urlunparse(parsed._replace(query=updated_query))
 
 
+def get_space_local_app_db_fallback_reason(
+    *,
+    is_huggingface_space: bool,
+    resolved_database_url: str,
+    prefer_local_app_db_on_space: bool,
+    allow_remote_app_db_on_space: bool,
+) -> str | None:
+    if not is_huggingface_space or not resolved_database_url.startswith("sqlite+libsql://"):
+        return None
+    if prefer_local_app_db_on_space:
+        return "local app DB preference enabled"
+    if not allow_remote_app_db_on_space:
+        return "remote app DB on Space is disabled"
+    return None
+
+
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=ROOT_DIR / ".env", env_file_encoding="utf-8", extra="ignore")
 
@@ -206,6 +222,15 @@ class Settings(BaseSettings):
     @property
     def is_huggingface_space(self) -> bool:
         return bool(os.getenv("SPACE_ID") or os.getenv("SPACE_HOST"))
+
+    @property
+    def space_local_app_db_fallback_reason(self) -> str | None:
+        return get_space_local_app_db_fallback_reason(
+            is_huggingface_space=self.is_huggingface_space,
+            resolved_database_url=self.resolved_database_url,
+            prefer_local_app_db_on_space=self.prefer_local_app_db_on_space,
+            allow_remote_app_db_on_space=self.allow_remote_app_db_on_space,
+        )
 
 
 @lru_cache
