@@ -102,7 +102,10 @@ class Settings(BaseSettings):
         default=ROOT_DIR / "data" / "corpus" / "official_legal_corpus.jsonl",
         alias="LEGAL_CORPUS_PATH",
     )
-    remote_case_law_corpus_url: str = Field(default="", alias="REMOTE_CASE_LAW_CORPUS_URL")
+    remote_case_law_corpus_url: str = Field(
+        default=DEFAULT_REMOTE_CASE_LAW_CORPUS_URL,
+        alias="REMOTE_CASE_LAW_CORPUS_URL",
+    )
     bootstrap_corpus_path: Path = Field(
         default=ROOT_DIR / "data" / "sample" / "legal_corpus" / "legal_corpus.jsonl",
         alias="BOOTSTRAP_CORPUS_PATH",
