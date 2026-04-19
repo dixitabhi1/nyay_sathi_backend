@@ -7,6 +7,7 @@ from datetime import datetime, timedelta
 from fastapi import HTTPException, status
 from sqlalchemy import func, or_
 
+from app.core.config import Settings
 from app.db.session import SessionLocal
 from app.models.auth import User
 from app.models.lawyer import LawyerFollow, LawyerPost, LawyerPostLike, LawyerProfile, LawyerReview
@@ -40,7 +41,8 @@ from app.services.fir_service import FIRService
 
 
 class LawyerNetworkService:
-    def __init__(self, fir_service: FIRService) -> None:
+    def __init__(self, settings: Settings, fir_service: FIRService | None = None) -> None:
+        self.settings = settings
         self.fir_service = fir_service
         self._seed_checked = False
 
@@ -465,9 +467,19 @@ class LawyerNetworkService:
         finally:
             session.close()
 
-    def get_police_dashboard(self, limit: int = 8) -> PoliceDashboardResponse:
-        records = self.fir_service.list_records(limit=limit)
-        patterns = self.fir_service.crime_patterns(window_days=7)
+    def get_police_dashboard(
+        self,
+        limit: int = 8,
+        fir_service: FIRService | None = None,
+    ) -> PoliceDashboardResponse:
+        resolved_fir_service = fir_service or self.fir_service
+        if resolved_fir_service is None:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Police dashboard service is temporarily unavailable.",
+            )
+        records = resolved_fir_service.list_records(limit=limit)
+        patterns = resolved_fir_service.crime_patterns(window_days=7)
         queue = [self._serialize_queue_item(record) for record in records.records]
         cards = [
             PoliceDashboardCardResponse(
@@ -773,6 +785,9 @@ class LawyerNetworkService:
 
     def _ensure_seed_data(self, session) -> None:
         if self._seed_checked:
+            return
+        if not self.settings.lawyer_demo_seed_enabled:
+            self._seed_checked = True
             return
         existing = session.query(LawyerProfile.id).limit(1).first()
         if existing:

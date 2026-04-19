@@ -106,6 +106,7 @@ class Settings(BaseSettings):
     frontend_url: str = Field(default="http://localhost:5173", alias="FRONTEND_URL")
     auth_secret_key: str = Field(default_factory=lambda: secrets.token_urlsafe(48), alias="AUTH_SECRET_KEY")
     auth_token_ttl_hours: int = Field(default=24, alias="AUTH_TOKEN_TTL_HOURS")
+    auth_password_hash_iterations: int | None = Field(default=None, alias="AUTH_PASSWORD_HASH_ITERATIONS")
     admin_emails: str = Field(default="", alias="ADMIN_EMAILS")
     database_probe_timeout_seconds: float = Field(default=4.0, alias="DATABASE_PROBE_TIMEOUT_SECONDS")
     prefer_local_app_db_on_space: bool = Field(default=True, alias="PREFER_LOCAL_APP_DB_ON_SPACE")
@@ -113,6 +114,7 @@ class Settings(BaseSettings):
     persistent_storage_root: Path | None = Field(default=None, alias="PERSISTENT_STORAGE_ROOT")
     bootstrap_admin_password: str = Field(default="", alias="BOOTSTRAP_ADMIN_PASSWORD")
     bootstrap_admin_full_name: str = Field(default="NyayaSetu Admin", alias="BOOTSTRAP_ADMIN_FULL_NAME")
+    enable_demo_lawyer_seed: bool | None = Field(default=None, alias="ENABLE_DEMO_LAWYER_SEED")
 
     app_sqlite_path: Path = Field(default=Path("storage/db/nyayasetu.sqlite3"), alias="APP_SQLITE_PATH")
     database_url: str | None = Field(default=None, alias="DATABASE_URL")
@@ -231,6 +233,18 @@ class Settings(BaseSettings):
             prefer_local_app_db_on_space=self.prefer_local_app_db_on_space,
             allow_remote_app_db_on_space=self.allow_remote_app_db_on_space,
         )
+
+    @property
+    def resolved_auth_password_hash_iterations(self) -> int:
+        if self.auth_password_hash_iterations is not None:
+            return max(50_000, int(self.auth_password_hash_iterations))
+        return 60_000 if self.is_huggingface_space else 240_000
+
+    @property
+    def lawyer_demo_seed_enabled(self) -> bool:
+        if self.enable_demo_lawyer_seed is not None:
+            return self.enable_demo_lawyer_seed
+        return self.app_env.strip().lower() == "development" and not self.is_huggingface_space
 
 
 @lru_cache

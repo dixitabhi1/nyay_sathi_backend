@@ -164,6 +164,9 @@ class AuthService:
                 if not user.is_active:
                     user.is_active = True
                     changed = True
+                if self.settings.bootstrap_admin_password and self._password_hash_needs_rehash(user.password_hash):
+                    user.password_hash = self._hash_password(self.settings.bootstrap_admin_password)
+                    changed = True
                 if changed:
                     user.approval_notes = "Admin account synchronized automatically from the operator allowlist."
                     user.approval_updated_at = datetime.utcnow()
@@ -199,6 +202,10 @@ class AuthService:
                 raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid email or password.")
             if not user.is_active:
                 raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="This account is inactive.")
+            if self._password_hash_needs_rehash(user.password_hash):
+                user.password_hash = self._hash_password(password)
+                user.updated_at = datetime.utcnow()
+                session.add(user)
             return self._issue_session(session, user, user_agent, ip_address)
         finally:
             session.close()
@@ -404,7 +411,7 @@ class AuthService:
 
     def _hash_password(self, password: str) -> str:
         salt = secrets.token_hex(16)
-        iterations = 390000
+        iterations = self.settings.resolved_auth_password_hash_iterations
         digest = hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), salt.encode("utf-8"), iterations).hex()
         return f"pbkdf2_sha256${iterations}${salt}${digest}"
 
@@ -422,6 +429,19 @@ class AuthService:
             int(iteration_text),
         ).hex()
         return hmac.compare_digest(digest, expected_digest)
+
+    def _password_hash_needs_rehash(self, stored_hash: str) -> bool:
+        try:
+            algorithm, iteration_text, *_ = stored_hash.split("$", 3)
+        except ValueError:
+            return True
+        if algorithm != "pbkdf2_sha256":
+            return True
+        try:
+            stored_iterations = int(iteration_text)
+        except ValueError:
+            return True
+        return stored_iterations != self.settings.resolved_auth_password_hash_iterations
 
     def _hash_token(self, token: str) -> str:
         secret = self.settings.auth_secret_key.encode("utf-8")

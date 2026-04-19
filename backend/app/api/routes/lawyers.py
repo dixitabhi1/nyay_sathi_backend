@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, Query, status
 
-from app.core.dependencies import get_lawyer_network_service
+from app.core.dependencies import get_fir_service, get_lawyer_network_service
 from app.core.security import get_current_lawyer_user, get_current_police_user, get_current_user, get_optional_current_user
 from app.models.auth import User
 from app.schemas.lawyers import (
@@ -17,6 +17,7 @@ from app.schemas.lawyers import (
     LawyerRegistrationResponse,
     PoliceDashboardResponse,
 )
+from app.services.fir_service import FIRService
 from app.services.lawyers import LawyerNetworkService
 
 
@@ -83,9 +84,10 @@ def toggle_post_like(
 def police_dashboard(
     limit: int = Query(default=8, ge=1, le=50),
     lawyer_service: LawyerNetworkService = Depends(get_lawyer_network_service),
+    fir_service: FIRService = Depends(get_fir_service),
     current_user: User = Depends(get_current_police_user),
 ) -> PoliceDashboardResponse:
-    return lawyer_service.get_police_dashboard(limit=limit)
+    return lawyer_service.get_police_dashboard(limit=limit, fir_service=fir_service)
 
 
 @router.get("/dashboard/me", response_model=LawyerDashboardResponse)

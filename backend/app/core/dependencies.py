@@ -155,7 +155,7 @@ def get_fir_service() -> FIRService:
 @lru_cache
 def get_lawyer_network_service() -> LawyerNetworkService:
     init_db()
-    return LawyerNetworkService(get_fir_service())
+    return LawyerNetworkService(get_settings())
 
 
 @lru_cache
