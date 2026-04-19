@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 
 def _warm_retriever_in_background() -> None:
     try:
-        get_retriever().ensure_index()
+        get_retriever().warm_indexes()
     except Exception as exc:  # pragma: no cover - defensive startup guard for hosted runtimes
         logger.warning("Retriever warmup skipped during startup: %s", exc)
 

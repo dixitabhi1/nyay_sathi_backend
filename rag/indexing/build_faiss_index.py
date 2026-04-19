@@ -163,7 +163,7 @@ def main() -> None:
     index_path.parent.mkdir(parents=True, exist_ok=True)
     metadata_path.parent.mkdir(parents=True, exist_ok=True)
     faiss.write_index(index, str(index_path))
-    metadata_path.write_text(json.dumps(records, ensure_ascii=True, indent=2), encoding="utf-8")
+    metadata_path.write_text(json.dumps(records, ensure_ascii=True, separators=(",", ":")), encoding="utf-8")
     update_vector_positions(analytics_db, records)
 
     state["built_index_path"] = str(index_path)

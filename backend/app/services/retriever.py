@@ -4,6 +4,7 @@ import json
 from collections import OrderedDict
 from pathlib import Path
 import re
+from urllib.request import Request, urlopen
 
 from app.core.config import Settings
 from app.services.corpus_records import load_legal_corpus_records
@@ -82,13 +83,20 @@ class Retriever:
         self.page_index = page_index
         self._search_cache: OrderedDict[tuple[str, int], list[dict]] = OrderedDict()
         self._scope_cache: OrderedDict[str, dict] = OrderedDict()
+        self._case_law_index_checked = False
 
     def ensure_index(self) -> None:
         force_rebuild = False
+        self._ensure_remote_index_artifacts(force=False)
         if self.vector_store.exists() and self.page_index.exists():
             if not self._index_missing_case_law_corpus():
                 self._warmup_embeddings()
                 return
+            if self._ensure_remote_index_artifacts(force=True):
+                self._case_law_index_checked = False
+                if not self._index_missing_case_law_corpus():
+                    self._warmup_embeddings()
+                    return
             force_rebuild = True
 
         corpus_path = Path(self.settings.legal_corpus_path)
@@ -100,9 +108,48 @@ class Retriever:
             self.vector_store.build(embeddings, documents)
         if force_rebuild or not self.page_index.exists():
             self.page_index.build(documents)
+        self._case_law_index_checked = True
         self._warmup_embeddings()
 
+    def _ensure_remote_index_artifacts(self, force: bool) -> bool:
+        targets = [
+            (self.settings.remote_vector_index_url.strip(), self.vector_store.index_path),
+            (self.settings.remote_vector_metadata_url.strip(), self.vector_store.metadata_path),
+            (self.settings.remote_page_index_url.strip(), self.page_index.index_path),
+        ]
+        if not all(url for url, _ in targets):
+            return False
+        if not force and all(path.exists() for _, path in targets):
+            return False
+
+        downloaded_any = False
+        try:
+            for url, path in targets:
+                if path.exists() and not force:
+                    continue
+                self._download_file(url, path)
+                downloaded_any = True
+        except Exception:
+            return False
+        if downloaded_any:
+            self.vector_store.index = None
+            self.vector_store.metadata = []
+            self.page_index.payload = None
+            self.page_index.nodes = []
+            self.page_index.citation_lookup = {}
+        return downloaded_any
+
+    def _download_file(self, url: str, path: Path) -> None:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        temp_path = path.with_suffix(path.suffix + ".tmp")
+        request = Request(url, headers={"User-Agent": "NyayaSetu index bootstrap/1.0"})
+        with urlopen(request, timeout=120) as response:
+            temp_path.write_bytes(response.read())
+        temp_path.replace(path)
+
     def _index_missing_case_law_corpus(self) -> bool:
+        if self._case_law_index_checked:
+            return False
         has_case_law_source = (
             (Path(self.settings.legal_corpus_path).parent / "legal_case_law_corpus.jsonl").exists()
             or bool(self.settings.remote_case_law_corpus_url.strip())
@@ -111,14 +158,21 @@ class Retriever:
         if not has_case_law_source or not self.vector_store.metadata_path.exists():
             return False
         try:
-            metadata = json.loads(self.vector_store.metadata_path.read_text(encoding="utf-8"))
+            if self.vector_store.metadata:
+                metadata = self.vector_store.metadata
+            else:
+                with self.vector_store.metadata_path.open("r", encoding="utf-8") as handle:
+                    metadata = json.load(handle)
         except Exception:
             return True
-        return not any(
+        missing = not any(
             item.get("source_id") in {"indian_supreme_court_judgments_aws", "indian_high_court_judgments_aws"}
             for item in metadata
             if isinstance(item, dict)
         )
+        if not missing:
+            self._case_law_index_checked = True
+        return missing
 
     def ensure_ready(self) -> None:
         if not self.vector_store.exists() or not self.page_index.exists():
@@ -132,18 +186,66 @@ class Retriever:
         cached = self._cache_get(self._search_cache, cache_key)
         if cached is not None:
             return [dict(item) for item in cached]
+        exact_hits = self.lookup_exact_reference(normalized_query, requested_top_k)
+        if exact_hits and self._is_exact_reference_query(normalized_query):
+            final_hits = self._filter_grounded_hits(exact_hits)[:requested_top_k]
+            self._cache_set(self._search_cache, cache_key, final_hits, self.settings.retrieval_result_cache_size)
+            return [dict(item) for item in final_hits]
         query_parts = self._expand_query_parts(self._decompose_query(normalized_query))
         semantic_hits = self._search_semantic_queries(query_parts, requested_top_k)
-        structural_hits = self._search_page_index_queries(query_parts, requested_top_k)
+        structural_hits = (
+            self._search_page_index_queries(query_parts, requested_top_k)
+            if self._should_use_page_index(query_parts, requested_top_k)
+            else []
+        )
         fused_hits = self._fuse_hits(normalized_query, semantic_hits, structural_hits, requested_top_k)
         grounded_hits = self._filter_grounded_hits(fused_hits)
         final_hits = grounded_hits[:requested_top_k]
         self._cache_set(self._search_cache, cache_key, final_hits, self.settings.retrieval_result_cache_size)
         return [dict(item) for item in final_hits]
 
+    def _is_exact_reference_query(self, query: str) -> bool:
+        normalized = query.lower()
+        return bool(self._detect_statute(normalized) and re.search(r"\bsection\s+\d+[a-zA-Z-]*(?:\([\da-zA-Z]+\))?", normalized))
+
+    def warm_indexes(self) -> None:
+        self.ensure_index()
+        self.vector_store.load()
+        _ = self.embeddings.legal_scope_anchor_embeddings
+
+    def _should_use_page_index(self, query_parts: list[str], top_k: int) -> bool:
+        if top_k > 24:
+            return False
+        query = " ".join(query_parts).lower()
+        if re.search(r"\bchapter\s+[ivxlcdm\d]+", query) or re.search(r"\bsection\s+\d+", query):
+            return True
+        if self._detect_statute(query) and any(term in query for term in ("procedure", "rights", "punishment", "cognizable", "bailable")):
+            return True
+        return False
+
     def search_by_vector(self, query_vector, top_k: int) -> list[dict]:
         self.ensure_ready()
         return self.vector_store.search(query_vector, top_k)
+
+    def search_case_law(self, query: str, top_k: int = 10) -> list[dict]:
+        self.ensure_ready()
+        normalized_query = re.sub(r"\s+", " ", query.strip())
+        cache_key = (f"case_law::{normalized_query.lower()}", top_k)
+        cached = self._cache_get(self._search_cache, cache_key)
+        if cached is not None:
+            return [dict(item) for item in cached]
+
+        query_vector = self.embeddings.encode_query(normalized_query)
+        candidate_top_k = max(600, top_k * 80)
+        raw_hits = self.search_by_vector(query_vector, candidate_top_k)
+        case_hits = [
+            item for item in raw_hits
+            if str(item.get("source_type", "")).lower() in {"judgment", "case_law", "precedent"}
+            and self._is_grounded_legal_hit(item)
+        ]
+        reranked = self._rerank_hits(normalized_query, case_hits, top_k)
+        self._cache_set(self._search_cache, cache_key, reranked, self.settings.retrieval_result_cache_size)
+        return [dict(item) for item in reranked]
 
     def assess_scope(self, query: str) -> dict:
         self.ensure_ready()

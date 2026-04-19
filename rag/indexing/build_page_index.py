@@ -34,7 +34,7 @@ def main() -> None:
     page_index = PageIndexStore(settings)
     page_index.index_path = Path(args.page_index_path)
     page_index.build(records)
-    print(f"Built PageIndex with {len(records)} records at {page_index.index_path}.")
+    print(f"Built PageIndex with {len(page_index.nodes)} structural records at {page_index.index_path}.")
 
 
 if __name__ == "__main__":

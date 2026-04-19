@@ -336,8 +336,8 @@ class LegalEngine:
 
     def research(self, payload: ResearchRequest) -> ResearchResponse:
         query = payload.effective_query
-        retrieval_k = max(payload.top_k, 80) if payload.mode == "case_search" else payload.top_k
-        hits = self._retrieve_sources(self._boost_legal_query(query), retrieval_k)
+        boosted_query = self._boost_legal_query(query)
+        hits = self._retrieve_sources(boosted_query, payload.top_k)
         display_hits = hits[: payload.top_k]
         summary = "Hybrid retrieval combined semantic RAG hits with PageIndex section navigation for this legal research query."
 
@@ -368,7 +368,13 @@ class LegalEngine:
                 hits=display_hits,
             )
 
-        case_results = self._build_case_search_results(hits)
+        case_law_hits = (
+            self._build_source_documents(self.retriever.search_case_law(boosted_query, top_k=max(payload.top_k, 10)))
+            if self._should_search_case_law(query)
+            else []
+        )
+        case_results = self._build_case_search_results(case_law_hits)
+        display_hits = self._dedupe_sources([*case_law_hits[: payload.top_k], *display_hits])[: payload.top_k]
         message = None
         if not case_results:
             message = (
@@ -384,6 +390,42 @@ class LegalEngine:
             summary=summary,
             hits=display_hits,
         )
+
+    def _dedupe_sources(self, sources: list[SourceDocument]) -> list[SourceDocument]:
+        deduped: list[SourceDocument] = []
+        seen: set[str] = set()
+        for source in sources:
+            key = f"{source.citation}|{source.source_url}|{source.title}"
+            if key in seen:
+                continue
+            seen.add(key)
+            deduped.append(source)
+        return deduped
+
+    def _should_search_case_law(self, query: str) -> bool:
+        normalized = query.lower()
+        explicit_statute_reference = bool(
+            re.search(r"\bsection\s+\d+[a-zA-Z-]*(?:\([\da-zA-Z]+\))?", normalized)
+            and any(term in normalized for term in ("bns", "bnss", "bsa", "ipc", "crpc", "dpdp", "act"))
+        )
+        case_law_intent = any(
+            term in normalized
+            for term in (
+                "case",
+                "cases",
+                "judgment",
+                "judgement",
+                "precedent",
+                "citation",
+                "court",
+                "verdict",
+                "similar",
+                "acquittal",
+                "appeal",
+                "trial",
+            )
+        )
+        return case_law_intent or not explicit_statute_reference
 
     async def analyze_contract(
         self,

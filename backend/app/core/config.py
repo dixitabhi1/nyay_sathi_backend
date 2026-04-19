@@ -16,6 +16,18 @@ DEFAULT_REMOTE_CASE_LAW_CORPUS_URL = (
     "https://raw.githubusercontent.com/dixitabhi1/nyay_sathi_backend/main/"
     "data/corpus/legal_case_law_corpus.jsonl"
 )
+DEFAULT_REMOTE_VECTOR_INDEX_URL = (
+    "https://raw.githubusercontent.com/dixitabhi1/nyay_sathi_backend/main/"
+    "data/index/legal.index"
+)
+DEFAULT_REMOTE_VECTOR_METADATA_URL = (
+    "https://raw.githubusercontent.com/dixitabhi1/nyay_sathi_backend/main/"
+    "data/index/legal_metadata.json"
+)
+DEFAULT_REMOTE_PAGE_INDEX_URL = (
+    "https://raw.githubusercontent.com/dixitabhi1/nyay_sathi_backend/main/"
+    "data/index/legal_page_index.json"
+)
 HF_PERSISTENT_STORAGE_ROOT = Path("/data/nyayasetu")
 
 
@@ -106,6 +118,9 @@ class Settings(BaseSettings):
         default=DEFAULT_REMOTE_CASE_LAW_CORPUS_URL,
         alias="REMOTE_CASE_LAW_CORPUS_URL",
     )
+    remote_vector_index_url: str = Field(default=DEFAULT_REMOTE_VECTOR_INDEX_URL, alias="REMOTE_VECTOR_INDEX_URL")
+    remote_vector_metadata_url: str = Field(default=DEFAULT_REMOTE_VECTOR_METADATA_URL, alias="REMOTE_VECTOR_METADATA_URL")
+    remote_page_index_url: str = Field(default=DEFAULT_REMOTE_PAGE_INDEX_URL, alias="REMOTE_PAGE_INDEX_URL")
     bootstrap_corpus_path: Path = Field(
         default=ROOT_DIR / "data" / "sample" / "legal_corpus" / "legal_corpus.jsonl",
         alias="BOOTSTRAP_CORPUS_PATH",

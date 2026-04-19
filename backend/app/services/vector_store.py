@@ -25,14 +25,15 @@ class FaissVectorStore:
         index = faiss.IndexFlatIP(dimension)
         index.add(embeddings)
         faiss.write_index(index, str(self.index_path))
-        self.metadata_path.write_text(json.dumps(metadata, ensure_ascii=True, indent=2), encoding="utf-8")
+        self.metadata_path.write_text(json.dumps(metadata, ensure_ascii=True, separators=(",", ":")), encoding="utf-8")
         self.index = index
         self.metadata = metadata
 
     def load(self) -> None:
         if self.index is None:
             self.index = faiss.read_index(str(self.index_path))
-            self.metadata = json.loads(self.metadata_path.read_text(encoding="utf-8"))
+            with self.metadata_path.open("r", encoding="utf-8") as handle:
+                self.metadata = json.load(handle)
 
     def search(self, query_vector: np.ndarray, top_k: int) -> list[dict]:
         self.load()
@@ -45,4 +46,3 @@ class FaissVectorStore:
             item["score"] = float(score)
             matches.append(item)
         return matches
-

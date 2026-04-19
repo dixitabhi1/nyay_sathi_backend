@@ -125,6 +125,8 @@ class PageIndexStore:
         citation_lookup: dict[str, list[int]] = defaultdict(list)
 
         for record in records:
+            if not self._should_index_record(record):
+                continue
             node = self._record_to_node(record)
             node_index = len(nodes)
             nodes.append(node)
@@ -188,16 +190,24 @@ class PageIndexStore:
             "citation_lookup": {key: value for key, value in citation_lookup.items()},
         }
         self.index_path.parent.mkdir(parents=True, exist_ok=True)
-        self.index_path.write_text(json.dumps(payload, ensure_ascii=True, indent=2), encoding="utf-8")
+        self.index_path.write_text(json.dumps(payload, ensure_ascii=True, separators=(",", ":")), encoding="utf-8")
         self.payload = payload
         self.nodes = nodes
         self.citation_lookup = payload["citation_lookup"]
 
     def load(self) -> None:
         if self.payload is None:
-            self.payload = json.loads(self.index_path.read_text(encoding="utf-8"))
+            with self.index_path.open("r", encoding="utf-8") as handle:
+                self.payload = json.load(handle)
             self.nodes = self.payload.get("nodes", [])
             self.citation_lookup = self.payload.get("citation_lookup", {})
+
+    def _should_index_record(self, record: dict) -> bool:
+        source_type = str(record.get("source_type", "")).lower()
+        document_type = str(record.get("document_type", "")).lower()
+        if source_type in {"judgment", "case_law", "precedent"} or document_type == "case_law":
+            return False
+        return True
 
     def search(self, query: str, top_k: int) -> list[dict]:
         self.load()

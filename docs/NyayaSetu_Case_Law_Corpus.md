@@ -50,6 +50,8 @@
 - Legal research fetches a wider candidate set for `case_search` so statutes do not crowd out judgment matches.
 - Frontend research output now renders verified case cards with court, similarity score, verdict/disposal, reasoning metadata, and source links.
 - Hugging Face Spaces cannot accept non-LFS files over 10 MiB, so the Space deployment can cache this corpus from `REMOTE_CASE_LAW_CORPUS_URL`. When that environment variable is not set on a Space, NyayaSetu falls back to the GitHub raw corpus URL for this repository.
+- Runtime deployments can also cache prebuilt retrieval artifacts from `REMOTE_VECTOR_INDEX_URL`, `REMOTE_VECTOR_METADATA_URL`, and `REMOTE_PAGE_INDEX_URL`. This avoids recomputing embeddings on Space cold starts.
+- PageIndex intentionally stores only statute/section records. Judgment records remain in FAISS semantic search because they do not fit the Act -> Chapter -> Section -> Clause tree and made PageIndex unnecessarily large.
 
 ## Limitations
 
