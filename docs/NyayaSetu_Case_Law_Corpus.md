@@ -49,6 +49,7 @@
 - Each row stores `case_title`, `court`, `parties`, `decision_date`, `case_number`, `verdict`, `bench`, `dataset`, and `source_url`.
 - Legal research fetches a wider candidate set for `case_search` so statutes do not crowd out judgment matches.
 - Frontend research output now renders verified case cards with court, similarity score, verdict/disposal, reasoning metadata, and source links.
+- Hugging Face Spaces cannot accept non-LFS files over 10 MiB, so the Space deployment can cache this corpus from `REMOTE_CASE_LAW_CORPUS_URL`. When that environment variable is not set on a Space, NyayaSetu falls back to the GitHub raw corpus URL for this repository.
 
 ## Limitations
 

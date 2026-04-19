@@ -12,6 +12,10 @@ ROOT_DIR = Path(__file__).resolve().parents[3]
 SPACE_BOOTSTRAP_ADMIN_EMAILS = {
     "abhishek1530002@gmail.com",
 }
+DEFAULT_REMOTE_CASE_LAW_CORPUS_URL = (
+    "https://raw.githubusercontent.com/dixitabhi1/nyay_sathi_backend/main/"
+    "data/corpus/legal_case_law_corpus.jsonl"
+)
 HF_PERSISTENT_STORAGE_ROOT = Path("/data/nyayasetu")
 
 
@@ -98,6 +102,7 @@ class Settings(BaseSettings):
         default=ROOT_DIR / "data" / "corpus" / "official_legal_corpus.jsonl",
         alias="LEGAL_CORPUS_PATH",
     )
+    remote_case_law_corpus_url: str = Field(default="", alias="REMOTE_CASE_LAW_CORPUS_URL")
     bootstrap_corpus_path: Path = Field(
         default=ROOT_DIR / "data" / "sample" / "legal_corpus" / "legal_corpus.jsonl",
         alias="BOOTSTRAP_CORPUS_PATH",
