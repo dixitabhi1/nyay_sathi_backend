@@ -236,9 +236,12 @@ class Settings(BaseSettings):
 
     @property
     def resolved_auth_password_hash_iterations(self) -> int:
+        if self.is_huggingface_space:
+            configured = int(self.auth_password_hash_iterations) if self.auth_password_hash_iterations is not None else 60_000
+            return min(60_000, max(20_000, configured))
         if self.auth_password_hash_iterations is not None:
             return max(50_000, int(self.auth_password_hash_iterations))
-        return 60_000 if self.is_huggingface_space else 240_000
+        return 240_000
 
     @property
     def lawyer_demo_seed_enabled(self) -> bool:
