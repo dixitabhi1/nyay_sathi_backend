@@ -4,8 +4,12 @@ from pydantic import BaseModel, Field
 
 
 class ContractClause(BaseModel):
-    heading: str
-    content: str
+    clause_name: str
+    summary: str
+    risk_level: str
+    issue: str
+    suggestion: str
+    improved_clause: str
 
 
 class ContractRisk(BaseModel):
@@ -15,10 +19,16 @@ class ContractRisk(BaseModel):
 
 
 class ContractAnalysisResponse(BaseModel):
-    summary: str
-    clauses: list[ContractClause]
-    risks: list[ContractRisk]
-    missing_clauses: list[str]
+    contract_type: str
+    parties: list[str] = Field(default_factory=list)
+    risk_score: int
+    risk_level: str
+    key_risks: list[str] = Field(default_factory=list)
+    missing_clauses: list[str] = Field(default_factory=list)
+    clauses: list[ContractClause] = Field(default_factory=list)
+    negotiation_insights: list[str] = Field(default_factory=list)
+    final_summary: str
+    summary: str | None = None
 
 
 class EvidenceEntity(BaseModel):

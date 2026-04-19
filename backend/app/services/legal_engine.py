@@ -2,11 +2,14 @@ from __future__ import annotations
 
 import json
 import re
+from collections import Counter
 from textwrap import dedent
 
 from fastapi import HTTPException, UploadFile
 
 from app.core.config import Settings
+from app.db.session import SessionLocal
+from app.models.fir import FIRIntelligence, FIRRecord
 from app.schemas.analysis import (
     CaseAnalysisRequest,
     CaseAnalysisResponse,
@@ -16,16 +19,16 @@ from app.schemas.analysis import (
     DraftGenerationResponse,
     FirDraftRequest,
     FirDraftResponse,
+    SimilarCaseReference,
 )
 from app.schemas.chat import ChatRequest, ChatResponse, SourceDocument
 from app.schemas.documents import (
     ContractAnalysisResponse,
     ContractClause,
-    ContractRisk,
     EvidenceAnalysisResponse,
     EvidenceEntity,
 )
-from app.schemas.research import ResearchRequest, ResearchResponse
+from app.schemas.research import ResearchCaseResult, ResearchFIRAnalysis, ResearchRequest, ResearchResponse
 from app.services.document_ingestion import DocumentIngestionService
 from app.services.inference import InferenceGateway
 from app.services.retriever import Retriever
@@ -97,70 +100,161 @@ class LegalEngine:
         )
 
     def analyze_case(self, payload: CaseAnalysisRequest) -> CaseAnalysisResponse:
-        query = " ".join([payload.incident_description, payload.location or "", " ".join(payload.evidence)])
+        query = self._boost_legal_query(" ".join(
+            [
+                payload.incident_description,
+                payload.location or "",
+                payload.incident_date or "",
+                " ".join(payload.evidence),
+            ]
+        ).strip())
         sources = self._retrieve_sources(query)
         laws = [source.citation for source in sources]
-        punishment = "; ".join(sorted({source.excerpt.split(".")[0] for source in sources})) or "Punishment depends on the final charge sheet and judicial findings."
-        next_steps = [
-            "Preserve original records, screenshots, and device metadata.",
-            "Prepare a chronology of events with dates, times, and witnesses.",
-            "Consult a lawyer before filing or responding to legal notices.",
-        ]
-        if not payload.evidence:
-            next_steps.insert(0, "Collect primary evidence before approaching the police or court.")
-
-        reasoning_prompt = dedent(
-            f"""
-            Incident: {payload.incident_description}
-            Location: {payload.location}
-            Date: {payload.incident_date}
-            People involved: {", ".join(payload.people_involved)}
-            Evidence: {", ".join(payload.evidence)}
-            Context:
-            {self._format_sources_for_prompt(sources)}
-            """
-        ).strip()
-        generated = self.inference.generate(
-            "Generate a structured legal analysis for a citizen-facing assistant. Explain why the cited sections may apply.",
-            reasoning_prompt,
+        case_type = self._infer_case_type(payload.incident_description, laws)
+        parties = payload.people_involved or self._infer_parties(payload.incident_description)
+        key_facts = self._extract_case_facts(payload.incident_description, payload.location, payload.incident_date)
+        legal_issues = self._infer_legal_issues(payload.incident_description, sources)
+        strengths = self._derive_case_strengths(payload.incident_description, payload.evidence, sources)
+        weaknesses = self._derive_case_weaknesses(payload.incident_description, payload.evidence, payload.location)
+        missing_elements = self._derive_missing_case_elements(payload)
+        suggested_actions = self._suggest_case_actions(case_type, payload.evidence)
+        possible_outcomes = self._infer_possible_outcomes(case_type, sources)
+        possible_punishment = self._summarize_possible_punishment(sources)
+        final_analysis = self._compose_case_analysis_summary(
+            case_type,
+            laws,
+            strengths,
+            weaknesses,
+            missing_elements,
         )
-        parsed = self._parse_generation(generated)
+        similar_cases = self._extract_verified_case_references(sources)
         return CaseAnalysisResponse(
-            case_summary=f"Incident at {payload.location or 'an unspecified location'} involving {len(payload.people_involved) or 1} primary parties.",
+            case_type=case_type,
+            parties=parties,
+            legal_sections=laws,
+            key_facts=key_facts,
+            legal_issues=legal_issues,
+            strengths=strengths,
+            weaknesses=weaknesses,
+            missing_elements=missing_elements,
+            possible_outcomes=possible_outcomes,
+            suggested_actions=suggested_actions,
+            similar_cases=similar_cases,
+            final_analysis=final_analysis,
+            case_summary=f"{case_type.title()} matter involving {len(parties) or 1} primary parties.",
             applicable_laws=laws,
-            legal_reasoning=parsed.get("reasoning") or self._fallback_reasoning(sources),
-            possible_punishment=punishment,
+            legal_reasoning=self._fallback_reasoning(sources),
+            possible_punishment=possible_punishment,
             evidence_required=self._suggest_evidence(payload.evidence),
-            recommended_next_steps=next_steps,
+            recommended_next_steps=suggested_actions,
             sources=sources,
         )
 
     def score_case_strength(self, payload: CaseStrengthRequest) -> CaseStrengthResponse:
-        score = 25
-        rationale: list[str] = []
-        score += min(payload.evidence_items * 8, 24)
-        if payload.evidence_items:
-            rationale.append("Physical or digital evidence improves provability.")
-        score += min(payload.witness_count * 6, 18)
-        if payload.witness_count:
-            rationale.append("Independent witnesses improve credibility.")
-        if payload.documentary_support:
-            score += 15
-            rationale.append("Documentary support reduces factual ambiguity.")
-        if payload.police_complaint_filed:
+        description = (payload.case_description or "").strip()
+        if description:
+            evidence_items = self._estimate_evidence_items(description)
+            witness_count = self._estimate_witness_count(description)
+            documentary_support = payload.documentary_support or self._has_documentary_support(description)
+            police_complaint_filed = payload.police_complaint_filed or bool(
+                re.search(r"\b(fir|complaint filed|police complaint|nc complaint)\b", description, flags=re.IGNORECASE)
+            )
+            incident_recency_days = payload.incident_recency_days
+            jurisdiction_match = payload.jurisdiction_match
+            sources = self._retrieve_sources(self._boost_legal_query(description))
+            case_type = self._infer_case_type(description, [source.citation for source in sources])
+        else:
+            evidence_items = payload.evidence_items or 0
+            witness_count = payload.witness_count or 0
+            documentary_support = payload.documentary_support
+            police_complaint_filed = payload.police_complaint_filed
+            incident_recency_days = payload.incident_recency_days
+            jurisdiction_match = payload.jurisdiction_match
+            sources = []
+            case_type = "criminal"
+
+        score = 24
+        key_strengths: list[str] = []
+        key_weaknesses: list[str] = []
+        missing_elements: list[str] = []
+
+        score += min(evidence_items * 9, 27)
+        if evidence_items:
+            key_strengths.append("The narrative already points to documentary or digital evidence.")
+        else:
+            key_weaknesses.append("The case currently lacks clearly described primary evidence.")
+            missing_elements.append("Upload or preserve screenshots, documents, CCTV, receipts, or device records.")
+
+        score += min(witness_count * 6, 18)
+        if witness_count:
+            key_strengths.append("Witness support improves corroboration.")
+        else:
+            key_weaknesses.append("No independent witness support is described yet.")
+
+        if documentary_support:
+            score += 14
+            key_strengths.append("Documentary support reduces ambiguity about the sequence of events.")
+        else:
+            missing_elements.append("Add contracts, notices, bills, bank records, or other written proof if available.")
+
+        if police_complaint_filed:
             score += 10
-            rationale.append("A contemporaneous complaint helps establish chronology.")
-        if payload.incident_recency_days <= 30:
-            score += 10
-            rationale.append("Recent incidents are easier to corroborate.")
-        if not payload.jurisdiction_match:
+            key_strengths.append("A prior formal complaint helps preserve chronology.")
+        elif case_type == "criminal":
+            key_weaknesses.append("No contemporaneous police or formal complaint is mentioned.")
+
+        if incident_recency_days <= 30:
+            score += 8
+            key_strengths.append("Recent incidents are usually easier to verify.")
+        else:
+            key_weaknesses.append("Delay can create evidentiary and recollection issues.")
+
+        if not jurisdiction_match:
             score -= 15
-            rationale.append("Jurisdiction mismatch can slow or weaken proceedings.")
+            key_weaknesses.append("Jurisdiction mismatch may delay maintainability and forum selection.")
+            missing_elements.append("Confirm the correct police station, court, or territorial jurisdiction.")
+
+        if description:
+            if len(description.split()) >= 40:
+                score += 6
+                key_strengths.append("The factual narrative is reasonably detailed and internally coherent.")
+            else:
+                key_weaknesses.append("The narrative is still short and may miss important legal facts.")
+            if case_type == "criminal":
+                score += 4
+            if case_type == "civil" and documentary_support:
+                score += 8
+                key_strengths.append("Civil maintainability looks stronger because written proof is already mentioned.")
+            if not self._extract_verified_case_references(sources):
+                missing_elements.append("Verified court-case support is unavailable until a case-law dataset is indexed.")
+
         score = max(0, min(score, 100))
-        verdict = "strong" if score >= 75 else "moderate" if score >= 45 else "weak"
-        if not rationale:
-            rationale.append("The baseline score is low because the case lacks corroborating inputs.")
-        return CaseStrengthResponse(score=score, verdict=verdict, rationale=rationale)
+        strength_label = "Strong Case" if score >= 71 else "Moderate Case" if score >= 41 else "Weak Case"
+        suggested_sections = [source.citation for source in sources[:5]]
+        similar_cases = self._extract_verified_case_references(sources)
+        rationale = [*key_strengths, *key_weaknesses]
+        final_analysis = self._compose_case_strength_summary(
+            score,
+            strength_label,
+            key_strengths,
+            key_weaknesses,
+            missing_elements,
+            suggested_sections,
+            bool(similar_cases),
+        )
+        return CaseStrengthResponse(
+            case_strength_score=score,
+            strength_label=strength_label,
+            key_strengths=key_strengths or ["The legal score is provisional and will improve with stronger evidence details."],
+            key_weaknesses=key_weaknesses or ["No major structural weakness was detected from the limited inputs."],
+            missing_elements=list(dict.fromkeys(missing_elements)),
+            suggested_sections=suggested_sections,
+            similar_cases=similar_cases,
+            final_analysis=final_analysis,
+            score=score,
+            verdict=strength_label,
+            rationale=rationale or ["The current score is based on limited structured indicators."],
+        )
 
     def generate_draft(self, payload: DraftGenerationRequest) -> DraftGenerationResponse:
         prompt = dedent(
@@ -241,9 +335,53 @@ class LegalEngine:
         return FirDraftResponse(fir_text=fir_text, sections=sections, filing_checklist=checklist)
 
     def research(self, payload: ResearchRequest) -> ResearchResponse:
-        hits = self._retrieve_sources(payload.query, payload.top_k)
+        query = payload.effective_query
+        hits = self._retrieve_sources(self._boost_legal_query(query), payload.top_k)
         summary = "Hybrid retrieval combined semantic RAG hits with PageIndex section navigation for this legal research query."
-        return ResearchResponse(summary=summary, hits=hits)
+
+        if payload.mode == "fir_analysis" and payload.user_role != "premium":
+            return ResearchResponse(
+                status="success",
+                mode=payload.mode,
+                results=[],
+                fir_analysis=ResearchFIRAnalysis(
+                    improved_draft="",
+                    suggested_sections="",
+                    risk_analysis="Upgrade required to access FIR intelligence features.",
+                ),
+                message="Upgrade required to access FIR intelligence features.",
+                summary=summary,
+                hits=hits,
+            )
+
+        if payload.mode == "fir_analysis":
+            fir_analysis = self._analyze_fir_intelligence(query)
+            return ResearchResponse(
+                status="success",
+                mode=payload.mode,
+                results=[],
+                fir_analysis=fir_analysis,
+                message="FIR intelligence generated from grounded statute retrieval and saved FIR comparisons.",
+                summary=summary,
+                hits=hits,
+            )
+
+        case_results = self._build_case_search_results(hits)
+        message = None
+        if not case_results:
+            message = (
+                "No verified Supreme Court or High Court matches were found in the currently indexed dataset. "
+                "Statutory guidance is shown separately until a case-law corpus is added."
+            )
+        return ResearchResponse(
+            status="success",
+            mode=payload.mode,
+            results=case_results,
+            fir_analysis=ResearchFIRAnalysis(),
+            message=message,
+            summary=summary,
+            hits=hits,
+        )
 
     async def analyze_contract(
         self,
@@ -253,14 +391,29 @@ class LegalEngine:
     ) -> ContractAnalysisResponse:
         _ = user_id
         text = await self._resolve_text(contract_file, contract_text, "contract text or upload")
+        contract_type = self._detect_contract_type(text)
+        parties = self._extract_contract_parties(text)
         clauses = self._extract_clauses(text)
-        risks = self._detect_contract_risks(text)
         missing = self._missing_contract_clauses(text)
+        risk_score = self._score_contract_risk(clauses, missing)
+        risk_level = "High" if risk_score >= 67 else "Moderate" if risk_score >= 34 else "Low"
+        key_risks = [clause.issue for clause in clauses if clause.risk_level in {"High", "Medium"}]
+        negotiation_insights = self._contract_negotiation_insights(clauses, missing)
+        final_summary = (
+            f"This {contract_type.lower()} appears {risk_level.lower()} risk based on the current clause balance, "
+            "liability structure, and drafting completeness."
+        )
         return ContractAnalysisResponse(
-            summary=f"Contract reviewed with {len(clauses)} detected clauses and {len(risks)} flagged risks.",
-            clauses=clauses,
-            risks=risks,
+            contract_type=contract_type,
+            parties=parties,
+            risk_score=risk_score,
+            risk_level=risk_level,
+            key_risks=key_risks,
             missing_clauses=missing,
+            clauses=clauses,
+            negotiation_insights=negotiation_insights,
+            final_summary=final_summary,
+            summary=final_summary,
         )
 
     async def analyze_evidence(
@@ -386,12 +539,16 @@ class LegalEngine:
             return "https://www.indiacode.nic.in/handle/123456789/20062"
         if "bsa" in haystack or "bharatiya sakshya adhiniyam" in haystack:
             return "https://www.indiacode.nic.in/handle/123456789/20063"
+        if "crpc" in haystack or "code of criminal procedure" in haystack:
+            return "https://www.indiacode.nic.in/handle/123456789/15247"
+        if "dpdp" in haystack or "digital personal data protection" in haystack:
+            return "https://www.indiacode.nic.in/handle/123456789/22037?view_type=browse"
         if "evidence act" in haystack or "65b" in haystack:
             return "https://www.indiacode.nic.in/handle/123456789/2187"
         if "contract act" in haystack:
             return "https://www.indiacode.nic.in/handle/123456789/2185"
         if "ipc" in haystack or "penal code" in haystack:
-            return "https://www.indiacode.nic.in/bitstream/123456789/2263/1/A1860-45.pdf"
+            return "https://www.indiacode.nic.in/handle/123456789/12850"
         return None
 
     def _parse_generation(self, generated: str) -> dict:
@@ -465,6 +622,30 @@ class LegalEngine:
                 item for item in prioritized
                 if "bsa" in f"{item.get('title', '')} {item.get('citation', '')} {item.get('text', '')}".lower()
                 or "bharatiya sakshya adhiniyam" in f"{item.get('title', '')} {item.get('citation', '')} {item.get('text', '')}".lower()
+            ]
+            if filtered:
+                prioritized = filtered
+        if re.search(r"\bipc\b", normalized) or "indian penal code" in normalized:
+            filtered = [
+                item for item in prioritized
+                if "ipc" in f"{item.get('title', '')} {item.get('citation', '')} {item.get('text', '')}".lower()
+                or "indian penal code" in f"{item.get('title', '')} {item.get('citation', '')} {item.get('text', '')}".lower()
+            ]
+            if filtered:
+                prioritized = filtered
+        if re.search(r"\bcrpc\b", normalized) or "code of criminal procedure" in normalized:
+            filtered = [
+                item for item in prioritized
+                if "crpc" in f"{item.get('title', '')} {item.get('citation', '')} {item.get('text', '')}".lower()
+                or "code of criminal procedure" in f"{item.get('title', '')} {item.get('citation', '')} {item.get('text', '')}".lower()
+            ]
+            if filtered:
+                prioritized = filtered
+        if re.search(r"\bdpdp\b", normalized) or "digital personal data protection" in normalized:
+            filtered = [
+                item for item in prioritized
+                if "dpdp" in f"{item.get('title', '')} {item.get('citation', '')} {item.get('text', '')}".lower()
+                or "digital personal data protection" in f"{item.get('title', '')} {item.get('citation', '')} {item.get('text', '')}".lower()
             ]
             if filtered:
                 prioritized = filtered
@@ -758,67 +939,522 @@ class LegalEngine:
             return baseline
         return current_evidence + [item for item in baseline if item not in current_evidence]
 
-    def _extract_clauses(self, text: str) -> list[ContractClause]:
-        matches = re.split(r"\n(?=[A-Z][A-Za-z ]{3,40}:)", text)
-        clauses: list[ContractClause] = []
-        for chunk in matches[:12]:
-            lines = [line.strip() for line in chunk.splitlines() if line.strip()]
-            if not lines:
-                continue
-            heading = lines[0].rstrip(":")
-            body = " ".join(lines[1:]) or lines[0]
-            clauses.append(ContractClause(heading=heading, content=body[:500]))
-        if not clauses:
-            clauses.append(ContractClause(heading="General Terms", content=text[:700]))
-        return clauses
+    def _infer_case_type(self, description: str, laws: list[str]) -> str:
+        haystack = f"{description} {' '.join(laws)}".lower()
+        criminal_terms = (
+            "fir",
+            "police",
+            "arrest",
+            "bail",
+            "theft",
+            "fraud",
+            "cheating",
+            "assault",
+            "harassment",
+            "ipc",
+            "bns",
+            "bnss",
+            "crpc",
+            "seller took money",
+            "never delivered",
+            "payment fraud",
+        )
+        return "criminal" if any(term in haystack for term in criminal_terms) else "civil"
 
-    def _detect_contract_risks(self, text: str) -> list[ContractRisk]:
+    def _boost_legal_query(self, query: str) -> str:
+        normalized = query.lower()
+        expansions: list[str] = []
+        if (
+            any(keyword in normalized for keyword in ("money", "payment", "seller", "buyer", "delivery"))
+            and any(keyword in normalized for keyword in ("never delivered", "not delivered", "stopped responding", "dishonest", "fraud", "cheating", "scam"))
+        ):
+            expansions.append("cheating fraud property delivery IPC section 420 BNS section 318 online payment fraud")
+        if any(keyword in normalized for keyword in ("salary", "wages", "employer", "employment", "offer letter", "salary slip")):
+            expansions.append("employment salary dues written notice contract unpaid wages documentary proof")
+        if any(keyword in normalized for keyword in ("personal data", "privacy", "consent", "data breach", "data fiduciary", "dpdp")):
+            expansions.append("DPDP Act 2023 personal data consent data fiduciary grievance redressal")
+        if "fir" in normalized and any(keyword in normalized for keyword in ("register", "refuse", "cognizable", "complaint")):
+            expansions.append("CrPC section 154 BNSS section 173 FIR registration cognizable offence")
+        return " ".join([query, *expansions]).strip()
+
+    def _infer_parties(self, description: str) -> list[str]:
+        lowered = description.lower()
+        inferred: list[str] = []
+        party_map = {
+            "complainant": ("complainant", "victim", "informant", "tenant", "buyer", "employee", "wife", "husband"),
+            "respondent": ("accused", "landlord", "seller", "employer", "company", "husband", "wife"),
+        }
+        for label, keywords in party_map.items():
+            if any(keyword in lowered for keyword in keywords):
+                inferred.append(label.title())
+        return inferred or ["Complainant", "Opposite Party"]
+
+    def _extract_case_facts(self, description: str, location: str | None, incident_date: str | None) -> list[str]:
+        facts = [sentence.strip() for sentence in re.split(r"(?<=[.!?])\s+", description.strip()) if sentence.strip()]
+        selected = facts[:3]
+        if incident_date:
+            selected.append(f"Incident date mentioned: {incident_date}.")
+        if location:
+            selected.append(f"Incident location mentioned: {location}.")
+        return selected or [description[:280]]
+
+    def _infer_legal_issues(self, description: str, sources: list[SourceDocument]) -> list[str]:
+        lowered = description.lower()
+        issues: list[str] = []
+        if any(keyword in lowered for keyword in ("fraud", "cheating", "scam", "dishonest")):
+            issues.append("Possible cheating or deception-based criminal liability.")
+        if any(keyword in lowered for keyword in ("theft", "snatch", "stolen", "robbed")):
+            issues.append("Possible theft or dishonest misappropriation issues.")
+        if any(keyword in lowered for keyword in ("privacy", "personal data", "data breach", "consent")):
+            issues.append("Possible personal data processing and privacy compliance issues.")
+        if any(keyword in lowered for keyword in ("notice", "agreement", "payment", "rent", "deposit")):
+            issues.append("Contractual or notice-related obligations may need review.")
+        if not issues and sources:
+            issues.append(f"Potential applicability of {sources[0].citation}.")
+        return issues or ["Factual clarification is needed before narrowing the core legal issues."]
+
+    def _derive_case_strengths(self, description: str, evidence: list[str], sources: list[SourceDocument]) -> list[str]:
+        strengths: list[str] = []
+        if len(description.split()) >= 35:
+            strengths.append("The narrative contains enough detail for initial legal mapping.")
+        if evidence:
+            strengths.append("The matter already includes identified evidence sources.")
+        if any("official" in (source.source_url or "") or "indiacode.nic.in" in (source.source_url or "") for source in sources):
+            strengths.append("The analysis is grounded in official statutory material.")
+        return strengths or ["A preliminary legal pathway can be identified from the facts already provided."]
+
+    def _derive_case_weaknesses(self, description: str, evidence: list[str], location: str | None) -> list[str]:
+        weaknesses: list[str] = []
+        if len(description.split()) < 25:
+            weaknesses.append("The factual narrative is still short and may omit important legal details.")
+        if not evidence:
+            weaknesses.append("No direct evidence has been described yet.")
+        if not location:
+            weaknesses.append("Location is missing, which can affect jurisdiction and verification.")
+        return weaknesses
+
+    def _derive_missing_case_elements(self, payload: CaseAnalysisRequest) -> list[str]:
+        missing: list[str] = []
+        if not payload.incident_date:
+            missing.append("Exact incident date or date range.")
+        if not payload.location:
+            missing.append("Incident location or police station jurisdiction.")
+        if not payload.people_involved:
+            missing.append("Names or roles of the main parties involved.")
+        if not payload.evidence:
+            missing.append("Primary evidence such as screenshots, receipts, messages, CCTV, or witness details.")
+        return missing
+
+    def _suggest_case_actions(self, case_type: str, evidence: list[str]) -> list[str]:
+        actions = [
+            "Prepare a clear chronology of events with dates, times, and names.",
+            "Preserve original messages, screenshots, documents, and device metadata.",
+            "Consult a lawyer before filing or responding to any formal legal process.",
+        ]
+        if case_type == "criminal":
+            actions.insert(1, "Identify the correct police station and keep a ready complaint draft.")
+        if not evidence:
+            actions.insert(0, "Collect direct proof before escalation where possible.")
+        return actions
+
+    def _infer_possible_outcomes(self, case_type: str, sources: list[SourceDocument]) -> list[str]:
+        if case_type == "criminal":
+            return [
+                "Police complaint or FIR registration may follow if cognizable ingredients are made out.",
+                "Further investigation, witness examination, and evidence preservation will affect the final charges.",
+                "The final outcome will depend on proof quality, procedural compliance, and judicial assessment.",
+            ]
+        return [
+            "A legal notice, negotiated settlement, or civil filing may be considered depending on the evidence.",
+            "Relief may depend on contract terms, payment records, and proof of breach or loss.",
+        ]
+
+    def _summarize_possible_punishment(self, sources: list[SourceDocument]) -> str:
+        punishment_lines = [
+            self._plain_language_summary(source)
+            for source in sources
+            if any(keyword in source.excerpt.lower() for keyword in ("punished", "imprisonment", "fine"))
+        ]
+        if punishment_lines:
+            return "; ".join(dict.fromkeys(punishment_lines[:3]))
+        return "Possible punishment depends on the final sections invoked, proof produced, and judicial findings."
+
+    def _compose_case_analysis_summary(
+        self,
+        case_type: str,
+        laws: list[str],
+        strengths: list[str],
+        weaknesses: list[str],
+        missing_elements: list[str],
+    ) -> str:
+        law_hint = laws[0] if laws else "the retrieved legal materials"
+        lead_strength = (strengths[0] if strengths else "limited").rstrip(".")
+        lead_weakness = (weaknesses[0] if weaknesses else "the need for factual verification").rstrip(".")
+        lead_missing = (missing_elements[0] if missing_elements else "further corroboration").rstrip(".")
+        if case_type == "criminal":
+            return (
+                f"This appears to be a criminal matter with initial overlap against {law_hint}. "
+                f"The current strengths are {lead_strength.lower()}. "
+                f"The main risk is {lead_weakness.lower()}, "
+                f"and the highest-priority missing item is {lead_missing.lower()}."
+            )
+        return (
+            f"This appears to be a civil or mixed dispute that should be assessed against {law_hint}. "
+            f"The matter is presently strongest where {lead_strength.lower()}, "
+            f"but weaker where {lead_weakness.lower()}."
+        )
+
+    def _estimate_evidence_items(self, description: str) -> int:
+        matches = re.findall(
+            r"\b(screenshot|invoice|recording|photo|video|cctv|document|statement|receipt|chat|email|emails|bank record|salary slip|salary slips|offer letter|notice)\b",
+            description,
+            flags=re.IGNORECASE,
+        )
+        return min(len(set(match.lower() for match in matches)), 4)
+
+    def _estimate_witness_count(self, description: str) -> int:
+        if re.search(r"\b(witness|eyewitness|seen by|in front of others|independent witness)\b", description, flags=re.IGNORECASE):
+            return 1
+        return 0
+
+    def _has_documentary_support(self, description: str) -> bool:
+        return bool(
+            re.search(
+                r"\b(document|agreement|invoice|receipt|statement|email|emails|notice|bank record|medical report|salary slip|salary slips|offer letter)\b",
+                description,
+                flags=re.IGNORECASE,
+            )
+        )
+
+    def _compose_case_strength_summary(
+        self,
+        score: int,
+        label: str,
+        strengths: list[str],
+        weaknesses: list[str],
+        missing_elements: list[str],
+        suggested_sections: list[str],
+        has_similar_cases: bool,
+    ) -> str:
+        lead_strength = (strengths[0] if strengths else "limited baseline legal alignment").rstrip(".")
+        lead_weakness = (weaknesses[0] if weaknesses else "uncertainty in the available facts").rstrip(".")
+        lead_missing = (missing_elements[0] if missing_elements else "additional corroboration").rstrip(".")
+        precedent_line = (
+            "Verified precedent support was found in the indexed case-law dataset."
+            if has_similar_cases
+            else "The current deployment still needs a dedicated court-judgment corpus for verified precedent matching."
+        )
+        return (
+            f"The case scores {score}/100 and is presently classified as {label}. "
+            f"The strongest factor is {lead_strength.lower()}. "
+            f"The main risk is {lead_weakness.lower()}. "
+            f"The top missing item is {lead_missing.lower()}. "
+            f"The most relevant sections currently retrieved are {', '.join(suggested_sections[:3]) if suggested_sections else 'not yet clear'}. "
+            f"{precedent_line}"
+        )
+
+    def _extract_verified_case_references(self, sources: list[SourceDocument]) -> list[SimilarCaseReference]:
+        cases: list[SimilarCaseReference] = []
+        for source in sources:
+            if source.source_type not in {"judgment", "case_law", "precedent"}:
+                continue
+            court = "Supreme Court" if "sci.gov.in" in (source.source_url or "") else "High Court"
+            cases.append(
+                SimilarCaseReference(
+                    case_title=source.title,
+                    court=court,
+                    verdict=self._plain_language_summary(source),
+                    source_link=source.source_url or "",
+                    similarity_score=f"{round(source.score * 100, 1)}%",
+                    parties=source.title,
+                    fir_summary=source.excerpt[:220],
+                    charges=source.citation,
+                    comparison_reasoning=source.reference_path or source.citation,
+                    relevance=source.excerpt[:220],
+                    relevance_reason=source.reference_path or source.citation,
+                )
+            )
+        return cases[:5]
+
+    def _build_case_search_results(self, hits: list[SourceDocument]) -> list[ResearchCaseResult]:
+        results: list[ResearchCaseResult] = []
+        for source in hits:
+            if source.source_type not in {"judgment", "case_law", "precedent"}:
+                continue
+            court = "Supreme Court of India" if "sci.gov.in" in (source.source_url or "") else "High Court of India"
+            results.append(
+                ResearchCaseResult(
+                    case_title=source.title,
+                    court=court,
+                    similarity_score=f"{round(source.score * 100, 1)}%",
+                    parties=source.title,
+                    fir_summary=source.excerpt[:220],
+                    charges=source.citation,
+                    verdict=self._plain_language_summary(source),
+                    source_link=source.source_url or "",
+                    comparison_reasoning=source.reference_path or source.citation,
+                )
+            )
+        return results[:10]
+
+    def _analyze_fir_intelligence(self, query: str) -> ResearchFIRAnalysis:
+        sources = self._retrieve_sources(query, top_k=6)
+        suggested_sections = [source.citation for source in sources[:5]]
+        missing_items = self._detect_missing_fir_elements(query)
+        similar_firs = self._find_similar_fir_records(query, suggested_sections)
+        improved_draft = self._render_improved_fir_draft(query, suggested_sections, missing_items)
+        risk_parts = [
+            "FIR structure validation completed against the available narrative.",
+            f"Suggested sections: {', '.join(suggested_sections[:4]) if suggested_sections else 'insufficient grounded section match'}.",
+        ]
+        if missing_items:
+            risk_parts.append(f"Missing legal elements: {', '.join(missing_items)}.")
+        if similar_firs:
+            risk_parts.append(
+                "Past similar FIR patterns were found in NyayaSetu records: "
+                + "; ".join(similar_firs[:3])
+                + "."
+            )
+        else:
+            risk_parts.append("No close prior FIR record match was found in the current database.")
+        return ResearchFIRAnalysis(
+            improved_draft=improved_draft,
+            suggested_sections=", ".join(suggested_sections),
+            risk_analysis=" ".join(risk_parts).strip(),
+        )
+
+    def _detect_missing_fir_elements(self, query: str) -> list[str]:
+        lowered = query.lower()
+        missing: list[str] = []
+        checks = {
+            "incident date": r"\b(today|yesterday|last night|\d{1,2}[/-]\d{1,2}[/-]\d{2,4})\b",
+            "incident location": r"\b(at|near|in)\s+[a-z]",
+            "accused details": r"\b(accused|suspect|person|bike|vehicle|registration|mobile number)\b",
+            "witness information": r"\b(witness|seen by|in front of)\b",
+            "evidence information": r"\b(cctv|screenshot|photo|video|receipt|recording|document)\b",
+        }
+        for label, pattern in checks.items():
+            if not re.search(pattern, lowered, flags=re.IGNORECASE):
+                missing.append(label)
+        return missing
+
+    def _find_similar_fir_records(self, query: str, suggested_sections: list[str]) -> list[str]:
+        session = SessionLocal()
+        try:
+            query_tokens = {
+                token.lower()
+                for token in re.findall(r"[a-z0-9]{4,}", query.lower())
+                if token.lower() not in {"section", "police", "complaint", "report"}
+            }
+            rows = session.query(FIRRecord).order_by(FIRRecord.last_edited_at.desc()).limit(40).all()
+            ranked: list[tuple[int, str]] = []
+            for row in rows:
+                try:
+                    extracted = json.loads(row.extracted_payload)
+                except Exception:
+                    extracted = {}
+                incident_description = str(extracted.get("incident_description", ""))
+                row_tokens = set(re.findall(r"[a-z0-9]{4,}", incident_description.lower()))
+                overlap = len(query_tokens & row_tokens)
+                try:
+                    stored_sections = [item.get("citation", "") for item in json.loads(row.suggested_sections)]
+                except Exception:
+                    stored_sections = []
+                shared_sections = len(set(suggested_sections) & set(stored_sections))
+                if overlap == 0 and shared_sections == 0:
+                    continue
+                label = incident_description[:120] or row.id
+                ranked.append((shared_sections * 4 + overlap, label))
+            ranked.sort(key=lambda item: item[0], reverse=True)
+            return [label for _, label in ranked[:5]]
+        finally:
+            session.close()
+
+    def _render_improved_fir_draft(self, query: str, suggested_sections: list[str], missing_items: list[str]) -> str:
+        sections_block = ", ".join(suggested_sections[:4]) if suggested_sections else "[section mapping pending]"
+        missing_block = (
+            "\nMissing information to add: " + ", ".join(missing_items) + "."
+            if missing_items
+            else ""
+        )
+        return dedent(
+            f"""
+            To,
+            The Station House Officer
+
+            Subject: Request for registration of complaint / FIR
+
+            I respectfully submit that the following incident requires legal action:
+            {query.strip()}
+
+            Tentatively relevant sections:
+            {sections_block}
+
+            I request prompt registration, preservation of evidence, and further investigation as per law.{missing_block}
+            """
+        ).strip()
+
+    def _extract_clauses(self, text: str) -> list[ContractClause]:
+        clause_map = {
+            "Payment": ("payment", "fee", "invoice", "consideration"),
+            "Termination": ("termination", "terminate", "exit"),
+            "Liability": ("liability", "liable", "damages"),
+            "Indemnity": ("indemnity", "indemnify", "hold harmless"),
+            "Confidentiality": ("confidential", "non-disclosure", "nda"),
+            "Dispute Resolution": ("arbitration", "dispute", "jurisdiction", "governing law"),
+            "IP": ("intellectual property", "ip", "copyright", "license"),
+            "Force Majeure": ("force majeure", "act of god", "unforeseen event"),
+        }
         lowered = text.lower()
-        risks: list[ContractRisk] = []
-        if "automatic renewal" in lowered:
-            risks.append(
-                ContractRisk(
-                    severity="medium",
-                    issue="Automatic renewal clause detected.",
-                    recommendation="Add explicit notice and termination windows before renewal.",
+        clauses: list[ContractClause] = []
+        for clause_name, keywords in clause_map.items():
+            excerpt = self._contract_clause_excerpt(text, keywords)
+            if not excerpt:
+                continue
+            risk_level, issue, suggestion = self._contract_clause_risk(clause_name, excerpt)
+            improved_clause = self._contract_clause_rewrite(clause_name, excerpt, risk_level, suggestion)
+            clauses.append(
+                ContractClause(
+                    clause_name=clause_name,
+                    summary=excerpt[:260],
+                    risk_level=risk_level,
+                    issue=issue,
+                    suggestion=suggestion,
+                    improved_clause=improved_clause,
                 )
             )
-        if "sole discretion" in lowered or "without notice" in lowered:
-            risks.append(
-                ContractRisk(
-                    severity="high",
-                    issue="Unilateral control language may create imbalance.",
-                    recommendation="Limit discretionary powers and require prior written notice.",
+        if not clauses:
+            fallback_excerpt = text[:400].strip() or "No contract text could be extracted."
+            clauses.append(
+                ContractClause(
+                    clause_name="General Terms",
+                    summary=fallback_excerpt,
+                    risk_level="Medium",
+                    issue="The contract does not show clearly separable clause headings.",
+                    suggestion="Structure the contract into labelled clauses for easier review and negotiation.",
+                    improved_clause="Add clearly headed clauses for payment, liability, confidentiality, termination, and dispute resolution.",
                 )
             )
-        if "indemnify" in lowered and "cap" not in lowered:
-            risks.append(
-                ContractRisk(
-                    severity="high",
-                    issue="Indemnity appears uncapped.",
-                    recommendation="Negotiate liability caps and carve-outs.",
+        if "without notice" in lowered and not any(clause.clause_name == "Termination" for clause in clauses):
+            clauses.append(
+                ContractClause(
+                    clause_name="Termination",
+                    summary="Termination appears to be exercisable without notice.",
+                    risk_level="High",
+                    issue="Immediate termination without notice can create one-sided risk.",
+                    suggestion="Add prior written notice, cure period, and refund/settlement mechanics.",
+                    improved_clause="Either party may terminate this agreement by giving 30 days' written notice, subject to a 15-day cure period for remediable breaches.",
                 )
             )
-        if not risks:
-            risks.append(
-                ContractRisk(
-                    severity="low",
-                    issue="No obvious high-risk pattern matched the baseline rules.",
-                    recommendation="Run clause-level legal review before execution.",
-                )
-            )
-        return risks
+        return clauses
 
     def _missing_contract_clauses(self, text: str) -> list[str]:
         lowered = text.lower()
         expected = {
+            "payment": "Payment",
             "termination": "Termination",
+            "liability": "Liability",
+            "indemnity": "Indemnity",
+            "confidentiality": "Confidentiality",
             "governing law": "Governing Law",
             "dispute resolution": "Dispute Resolution",
-            "confidentiality": "Confidentiality",
-            "limitation of liability": "Limitation of Liability",
+            "intellectual property": "IP",
+            "force majeure": "Force Majeure",
         }
         return [label for key, label in expected.items() if key not in lowered]
+
+    def _detect_contract_type(self, text: str) -> str:
+        lowered = text.lower()
+        patterns = {
+            "Employment Contract": ("employment", "employee", "employer", "salary"),
+            "Rental Agreement": ("rent", "tenant", "landlord", "lease"),
+            "Service Agreement": ("service agreement", "services", "service provider", "scope of work"),
+            "Non-Disclosure Agreement": ("confidential", "non-disclosure", "nda"),
+            "Sale Agreement": ("sale", "buyer", "seller", "goods"),
+            "Consultancy Agreement": ("consultant", "consulting", "professional fee"),
+        }
+        for contract_type, keywords in patterns.items():
+            if any(keyword in lowered for keyword in keywords):
+                return contract_type
+        return "General Contract"
+
+    def _extract_contract_parties(self, text: str) -> list[str]:
+        between_match = re.search(r"between\s+(.+?)\s+and\s+(.+?)(?:,|\n|$)", text, flags=re.IGNORECASE | re.DOTALL)
+        if between_match:
+            parties = [between_match.group(1).strip(" ,."), between_match.group(2).strip(" ,.")]
+            return [party[:120] for party in parties if party]
+        candidates = re.findall(r"\b[A-Z][A-Za-z&., ]{2,40}\b", text[:500])
+        filtered = [candidate.strip(" ,.") for candidate in candidates if len(candidate.strip()) >= 3]
+        return list(dict.fromkeys(filtered[:4]))
+
+    def _contract_clause_excerpt(self, text: str, keywords: tuple[str, ...]) -> str:
+        lowered = text.lower()
+        for keyword in keywords:
+            index = lowered.find(keyword)
+            if index >= 0:
+                start = max(0, index - 90)
+                end = min(len(text), index + 250)
+                return re.sub(r"\s+", " ", text[start:end]).strip()
+        return ""
+
+    def _contract_clause_risk(self, clause_name: str, excerpt: str) -> tuple[str, str, str]:
+        lowered = excerpt.lower()
+        if clause_name == "Payment":
+            if "sole discretion" in lowered or "non-refundable" in lowered:
+                return "High", "Payment terms appear one-sided or insufficiently conditioned.", "Define milestones, invoice timelines, refund conditions, and late-fee limits."
+            return "Low", "Payment clause is present with no immediate red-flag language.", "Confirm due dates, invoice requirements, and tax treatment."
+        if clause_name == "Termination":
+            if "without notice" in lowered or "immediate" in lowered:
+                return "High", "Termination may be exercisable without adequate notice or cure rights.", "Add written notice, cure periods, and post-termination obligations."
+            return "Medium", "Termination clause exists but should still be checked for notice and cure structure.", "Ensure notice period, breach cure, and settlement mechanics are clearly stated."
+        if clause_name in {"Liability", "Indemnity"}:
+            if "unlimited" in lowered or ("indemn" in lowered and "cap" not in lowered):
+                return "High", "Exposure may be uncapped or commercially unbalanced.", "Introduce liability caps, exclusions, and narrowly tailored indemnity triggers."
+            return "Medium", "Liability allocation exists but may need balancing.", "Check whether the clause has reasonable caps, carve-outs, and reciprocal protection."
+        if clause_name == "Confidentiality":
+            if "perpetual" in lowered and "exception" not in lowered:
+                return "Medium", "Confidentiality obligations may be broad without clear exceptions.", "Define confidential information, exclusions, and survival period."
+            return "Low", "Confidentiality coverage is visible.", "Confirm exceptions, duration, and return/deletion obligations."
+        if clause_name == "Dispute Resolution":
+            if "exclusive jurisdiction" in lowered and "arbitration" not in lowered:
+                return "Medium", "Forum selection is present but dispute mechanics may be incomplete.", "Clarify negotiation step, governing law, seat, and procedure."
+            return "Low", "Dispute resolution clause appears present.", "Confirm governing law, forum, and escalation path."
+        if clause_name == "IP":
+            if "all rights" in lowered and "license" not in lowered:
+                return "High", "IP allocation may be overbroad or ambiguous.", "Specify ownership, license scope, derivative works, and pre-existing IP."
+            return "Medium", "IP language exists but should be scoped carefully.", "Separate background IP from deliverable ownership."
+        if clause_name == "Force Majeure":
+            return "Low", "Force majeure language is present.", "Check notice obligations and mitigation duty."
+        return "Medium", "Clause requires closer legal review.", "Clarify obligations, trigger conditions, and remedies."
+
+    def _contract_clause_rewrite(self, clause_name: str, excerpt: str, risk_level: str, suggestion: str) -> str:
+        if risk_level != "High":
+            return ""
+        templates = {
+            "Termination": "Either party may terminate this agreement for material breach upon 30 days' written notice if the breach remains uncured during that period.",
+            "Liability": "Neither party shall be liable for indirect or consequential loss, and aggregate liability shall not exceed the fees paid under this agreement, except for fraud, wilful misconduct, confidentiality breach, or third-party IP claims.",
+            "Indemnity": "Each party shall indemnify the other only for third-party claims arising from its breach, negligence, or wilful misconduct, subject to prompt notice and reasonable defence control.",
+            "Payment": "Invoices shall be raised against agreed milestones and paid within 15 days of receipt, with any good-faith dispute notified in writing within 7 days.",
+            "IP": "Each party retains ownership of its pre-existing intellectual property. Deliverables created specifically under this agreement shall vest as expressly stated, while any license granted shall be limited, non-exclusive, and purpose-specific.",
+        }
+        return templates.get(clause_name, f"Suggested rewrite: {suggestion} Current excerpt: {excerpt[:140]}")
+
+    def _score_contract_risk(self, clauses: list[ContractClause], missing: list[str]) -> int:
+        counter = Counter(clause.risk_level for clause in clauses)
+        score = counter.get("High", 0) * 22 + counter.get("Medium", 0) * 10 + len(missing) * 5
+        return max(0, min(100, score))
+
+    def _contract_negotiation_insights(self, clauses: list[ContractClause], missing: list[str]) -> list[str]:
+        insights = [
+            clause.suggestion
+            for clause in clauses
+            if clause.risk_level in {"High", "Medium"}
+        ]
+        if missing:
+            insights.append("Add missing commercial boilerplate before execution: " + ", ".join(missing[:4]) + ".")
+        if not insights:
+            insights.append("Negotiate only after validating governing law, payment cycle, and liability allocation.")
+        return list(dict.fromkeys(insights))
 
     def _extract_entities(self, text: str) -> list[EvidenceEntity]:
         entities: list[EvidenceEntity] = []

@@ -1,6 +1,22 @@
+from __future__ import annotations
+
 from pydantic import BaseModel, Field
 
 from app.schemas.chat import SourceDocument
+
+
+class SimilarCaseReference(BaseModel):
+    case_title: str
+    court: str
+    verdict: str
+    source_link: str
+    similarity_score: str | None = None
+    parties: str | None = None
+    fir_summary: str | None = None
+    charges: str | None = None
+    comparison_reasoning: str | None = None
+    relevance: str | None = None
+    relevance_reason: str | None = None
 
 
 class CaseAnalysisRequest(BaseModel):
@@ -14,13 +30,25 @@ class CaseAnalysisRequest(BaseModel):
 
 
 class CaseAnalysisResponse(BaseModel):
-    case_summary: str
-    applicable_laws: list[str]
-    legal_reasoning: str
-    possible_punishment: str
-    evidence_required: list[str]
-    recommended_next_steps: list[str]
-    sources: list[SourceDocument]
+    case_type: str
+    parties: list[str] = Field(default_factory=list)
+    legal_sections: list[str] = Field(default_factory=list)
+    key_facts: list[str] = Field(default_factory=list)
+    legal_issues: list[str] = Field(default_factory=list)
+    strengths: list[str] = Field(default_factory=list)
+    weaknesses: list[str] = Field(default_factory=list)
+    missing_elements: list[str] = Field(default_factory=list)
+    possible_outcomes: list[str] = Field(default_factory=list)
+    suggested_actions: list[str] = Field(default_factory=list)
+    similar_cases: list[SimilarCaseReference] = Field(default_factory=list)
+    final_analysis: str
+    case_summary: str | None = None
+    applicable_laws: list[str] = Field(default_factory=list)
+    legal_reasoning: str | None = None
+    possible_punishment: str | None = None
+    evidence_required: list[str] = Field(default_factory=list)
+    recommended_next_steps: list[str] = Field(default_factory=list)
+    sources: list[SourceDocument] = Field(default_factory=list)
 
 
 class DraftGenerationRequest(BaseModel):
@@ -56,8 +84,9 @@ class FirDraftResponse(BaseModel):
 
 
 class CaseStrengthRequest(BaseModel):
-    evidence_items: int = Field(ge=0)
-    witness_count: int = Field(ge=0)
+    case_description: str | None = None
+    evidence_items: int | None = Field(default=None, ge=0)
+    witness_count: int | None = Field(default=None, ge=0)
     documentary_support: bool = False
     police_complaint_filed: bool = False
     incident_recency_days: int = Field(default=30, ge=0)
@@ -66,7 +95,14 @@ class CaseStrengthRequest(BaseModel):
 
 
 class CaseStrengthResponse(BaseModel):
-    score: int
-    verdict: str
-    rationale: list[str]
-
+    case_strength_score: int
+    strength_label: str
+    key_strengths: list[str] = Field(default_factory=list)
+    key_weaknesses: list[str] = Field(default_factory=list)
+    missing_elements: list[str] = Field(default_factory=list)
+    suggested_sections: list[str] = Field(default_factory=list)
+    similar_cases: list[SimilarCaseReference] = Field(default_factory=list)
+    final_analysis: str
+    score: int | None = None
+    verdict: str | None = None
+    rationale: list[str] = Field(default_factory=list)

@@ -32,6 +32,19 @@ def load_jsonl(path: Path) -> list[dict]:
     return [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
 
 
+def merge_jsonl(paths: list[Path]) -> list[dict]:
+    merged: list[dict] = []
+    seen_keys: set[str] = set()
+    for path in paths:
+        for row in load_jsonl(path):
+            key = normalize_text(row.get("chunk_id") or row.get("citation") or row.get("question") or json.dumps(row, ensure_ascii=True))
+            if key.lower() in seen_keys:
+                continue
+            seen_keys.add(key.lower())
+            merged.append(row)
+    return merged
+
+
 def write_jsonl(path: Path, rows: list[dict]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text("\n".join(json.dumps(row, ensure_ascii=True) for row in rows), encoding="utf-8")
@@ -410,9 +423,11 @@ def split_rows(rows: list[dict], eval_ratio: float, seed: int) -> tuple[list[dic
 def main() -> None:
     parser = argparse.ArgumentParser(description="Prepare NyayaSetu instruction tuning datasets.")
     parser.add_argument("--qa-path", default="training/data/raw/legal_qa.jsonl")
+    parser.add_argument("--statute-expansion-path", default="training/data/raw/legal_statute_expansion_cases.jsonl")
     parser.add_argument("--hard-cases-path", default="training/data/raw/legal_style_hard_cases.jsonl")
     parser.add_argument("--legacy-bridge-path", default="training/data/raw/legal_legacy_bridge_cases.jsonl")
     parser.add_argument("--corpus-path", default="data/corpus/official_legal_corpus.jsonl")
+    parser.add_argument("--supplemental-corpus-path", default="data/corpus/legal_supplemental_corpus.jsonl")
     parser.add_argument("--fallback-corpus-path", default="data/sample/legal_corpus/legal_corpus.jsonl")
     parser.add_argument("--mapping-csv", default="ingestion/configs/ipc_bns_mappings.csv")
     parser.add_argument("--output-dir", default="training/data/processed")
@@ -422,16 +437,18 @@ def main() -> None:
     args = parser.parse_args()
 
     qa_rows = load_jsonl(Path(args.qa_path))
+    statute_expansion_rows = load_jsonl(Path(args.statute_expansion_path))
     hard_case_rows = load_jsonl(Path(args.hard_cases_path))
     legacy_bridge_rows = load_jsonl(Path(args.legacy_bridge_path))
     corpus_path = Path(args.corpus_path)
     if not corpus_path.exists():
         corpus_path = Path(args.fallback_corpus_path)
-    corpus_rows = load_jsonl(corpus_path)
+    corpus_rows = merge_jsonl([corpus_path, Path(args.supplemental_corpus_path)])
     mapping_rows = load_mappings(Path(args.mapping_csv))
 
     examples = []
     examples.extend(build_qa_examples(qa_rows))
+    examples.extend(build_qa_examples(statute_expansion_rows))
     examples.extend(build_qa_examples(hard_case_rows))
     examples.extend(build_qa_examples(legacy_bridge_rows))
     corpus_examples = build_corpus_examples(corpus_rows)

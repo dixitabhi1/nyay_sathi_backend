@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 import json
+from collections import OrderedDict
 from pathlib import Path
 import re
 
 from app.core.config import Settings
+from app.services.corpus_records import load_legal_corpus_records
 from app.services.embeddings import EmbeddingService, build_embedding_text
 from app.services.page_index import PageIndexStore
 from app.services.vector_store import FaissVectorStore
@@ -31,16 +33,17 @@ EXPLICIT_NON_LEGAL_PATTERNS = [
 ]
 
 LEGAL_INTENT_PATTERNS = [
-    re.compile(r"\b(section|sections|act|law|legal|fir|complaint|bns|bnss|bsa|ipc)\b", re.IGNORECASE),
+    re.compile(r"\b(section|sections|act|law|legal|fir|complaint|bns|bnss|bsa|ipc|crpc|dpdp)\b", re.IGNORECASE),
     re.compile(r"\b(arrest|bail|evidence|contract|notice|rights|judgment|court|police)\b", re.IGNORECASE),
     re.compile(r"\b(theft|cheating|fraud|threat|intimidation|assault|harassment|trespass)\b", re.IGNORECASE),
     re.compile(r"\b(defamation|extortion|murder|kidnapping|dowry|stalking|cybercrime|cyber crime)\b", re.IGNORECASE),
     re.compile(r"\b(tenant|landlord|property|consumer|copyright|trademark|divorce|maintenance|succession|will)\b", re.IGNORECASE),
+    re.compile(r"\b(data protection|personal data|privacy breach|data breach|consent notice)\b", re.IGNORECASE),
 ]
 
 LEGAL_REFERENCE_PATTERNS = [
     re.compile(r"\b(section|act|code|sanhita|adhiniyam|judgment|court|rights|procedure|fir)\b", re.IGNORECASE),
-    re.compile(r"\b(bns|bnss|bsa|ipc|crpc|contract act|evidence act|consumer protection)\b", re.IGNORECASE),
+    re.compile(r"\b(bns|bnss|bsa|ipc|crpc|dpdp|contract act|evidence act|consumer protection)\b", re.IGNORECASE),
 ]
 
 OFFICIAL_SOURCE_HOSTS = (
@@ -77,6 +80,8 @@ class Retriever:
         self.embeddings = embeddings
         self.vector_store = vector_store
         self.page_index = page_index
+        self._search_cache: OrderedDict[tuple[str, int], list[dict]] = OrderedDict()
+        self._scope_cache: OrderedDict[str, dict] = OrderedDict()
 
     def ensure_index(self) -> None:
         if self.vector_store.exists() and self.page_index.exists():
@@ -86,11 +91,7 @@ class Retriever:
         corpus_path = Path(self.settings.legal_corpus_path)
         if not corpus_path.exists():
             corpus_path = Path(self.settings.bootstrap_corpus_path)
-        documents = [
-            json.loads(line)
-            for line in corpus_path.read_text(encoding="utf-8").splitlines()
-            if line.strip()
-        ]
+        documents = load_legal_corpus_records(self.settings, corpus_path)
         if not self.vector_store.exists():
             embeddings = self.embeddings.encode(build_embedding_text(doc) for doc in documents)
             self.vector_store.build(embeddings, documents)
@@ -104,13 +105,20 @@ class Retriever:
 
     def search(self, query: str, top_k: int | None = None) -> list[dict]:
         self.ensure_ready()
+        normalized_query = re.sub(r"\s+", " ", query.strip())
         requested_top_k = top_k or self.settings.top_k_retrieval
-        query_parts = self._expand_query_parts(self._decompose_query(query))
+        cache_key = (normalized_query.lower(), requested_top_k)
+        cached = self._cache_get(self._search_cache, cache_key)
+        if cached is not None:
+            return [dict(item) for item in cached]
+        query_parts = self._expand_query_parts(self._decompose_query(normalized_query))
         semantic_hits = self._search_semantic_queries(query_parts, requested_top_k)
         structural_hits = self._search_page_index_queries(query_parts, requested_top_k)
-        fused_hits = self._fuse_hits(query, semantic_hits, structural_hits, requested_top_k)
+        fused_hits = self._fuse_hits(normalized_query, semantic_hits, structural_hits, requested_top_k)
         grounded_hits = self._filter_grounded_hits(fused_hits)
-        return grounded_hits[:requested_top_k]
+        final_hits = grounded_hits[:requested_top_k]
+        self._cache_set(self._search_cache, cache_key, final_hits, self.settings.retrieval_result_cache_size)
+        return [dict(item) for item in final_hits]
 
     def search_by_vector(self, query_vector, top_k: int) -> list[dict]:
         self.ensure_ready()
@@ -118,17 +126,23 @@ class Retriever:
 
     def assess_scope(self, query: str) -> dict:
         self.ensure_ready()
+        normalized_query = re.sub(r"\s+", " ", query.strip())
+        cached = self._cache_get(self._scope_cache, normalized_query.lower())
+        if cached is not None:
+            cached_copy = dict(cached)
+            cached_copy["hits"] = [dict(item) for item in cached.get("hits", [])]
+            return cached_copy
         explicit_override = self._explicit_scope_override(query)
         if explicit_override is not None:
             return explicit_override
 
-        has_legal_intent = self._has_legal_intent(query)
-        hits = self.search(query, self.settings.top_k_retrieval)
+        has_legal_intent = self._has_legal_intent(normalized_query)
+        hits = self.search(normalized_query, self.settings.top_k_retrieval)
         grounded_hits = self._filter_grounded_hits(hits)
         top_corpus_score = grounded_hits[0]["score"] if grounded_hits else 0.0
         top_page_index_score = max((float(item.get("page_index_score", 0.0)) for item in grounded_hits), default=0.0)
 
-        query_vector = self.embeddings.encode_query(query)
+        query_vector = self.embeddings.encode_query(normalized_query)
         legal_anchor_score = self.embeddings.max_similarity(query_vector, self.embeddings.legal_scope_anchor_embeddings)
         non_legal_anchor_score = self.embeddings.max_similarity(query_vector, self.embeddings.non_legal_scope_anchor_embeddings)
         anchor_margin = legal_anchor_score - non_legal_anchor_score
@@ -142,7 +156,7 @@ class Retriever:
             or top_corpus_score >= self.settings.legal_scope_corpus_threshold
             or structural_legal_match
         )
-        return {
+        response = {
             "in_scope": in_scope,
             "hits": grounded_hits if in_scope else [],
             "has_legal_intent": has_legal_intent,
@@ -154,6 +168,8 @@ class Retriever:
             "top_page_index_score": round(top_page_index_score, 4),
             "hybrid_confidence": round(top_corpus_score, 4),
         }
+        self._cache_set(self._scope_cache, normalized_query.lower(), response, self.settings.scope_assessment_cache_size)
+        return response
 
     def get_structure_overview(self, query: str) -> dict | None:
         self.ensure_ready()
@@ -403,6 +419,10 @@ class Retriever:
             return "bsa"
         if re.search(r"\bipc\b", normalized_query) or "indian penal code" in normalized_query:
             return "ipc"
+        if re.search(r"\bcrpc\b", normalized_query) or "code of criminal procedure" in normalized_query:
+            return "crpc"
+        if re.search(r"\bdpdp\b", normalized_query) or "digital personal data protection" in normalized_query or "personal data protection" in normalized_query:
+            return "dpdp"
         if "information technology act" in normalized_query or re.search(r"\bit act\b", normalized_query):
             return "it_act"
         return None
@@ -437,6 +457,21 @@ class Retriever:
                 or source_id.startswith("ipc_")
                 or bool(re.search(r"\bipc\b", haystack))
                 or "indian penal code" in haystack
+            )
+        if statute == "crpc":
+            return (
+                source_id == "crpc"
+                or source_id.startswith("crpc_")
+                or bool(re.search(r"\bcrpc\b", haystack))
+                or "code of criminal procedure" in haystack
+            )
+        if statute == "dpdp":
+            return (
+                source_id == "dpdp"
+                or source_id.startswith("dpdp_")
+                or bool(re.search(r"\bdpdp\b", haystack))
+                or "digital personal data protection" in haystack
+                or "act no. 22 of 2023" in haystack
             )
         if statute == "it_act":
             return (
@@ -488,6 +523,15 @@ class Retriever:
                 ]
             )
 
+        if "dpdp" in normalized or any(keyword in normalized for keyword in ("personal data", "data protection", "privacy breach", "data breach", "consent notice")):
+            expanded.extend(
+                [
+                    "DPDP Act 2023 section 4 grounds for processing personal data",
+                    "DPDP Act 2023 section 8 general obligations of data fiduciary",
+                    "DPDP Act 2023 section 13 grievance redressal",
+                ]
+            )
+
         if any(keyword in normalized for keyword in ("online payment", "payment fraud", "otp", "cyber fraud", "bank fraud")) or (
             any(keyword in normalized for keyword in ("online", "payment", "otp", "bank", "cyber"))
             and any(keyword in normalized for keyword in ("fraud", "cheating", "scam"))
@@ -528,6 +572,9 @@ class Retriever:
         normalized = query.lower()
         wants_bns = "bns" in normalized or "bharatiya nyaya sanhita" in normalized
         wants_bnss = "bnss" in normalized or "bharatiya nagarik suraksha sanhita" in normalized
+        wants_ipc = "ipc" in normalized or "indian penal code" in normalized
+        wants_crpc = "crpc" in normalized or "code of criminal procedure" in normalized
+        wants_dpdp = "dpdp" in normalized or "digital personal data protection" in normalized or "personal data protection" in normalized
         wants_ipc_compare = "ipc" in normalized or "compare" in normalized or "comparison" in normalized
         wants_arrest_rights = "arrest" in normalized and any(keyword in normalized for keyword in ("right", "rights", "bail", "advocate", "lawyer"))
         wants_fir_registration = "fir" in normalized and any(keyword in normalized for keyword in ("cognizable", "register", "registration", "refuse", "refusal"))
@@ -555,8 +602,16 @@ class Retriever:
                 adjusted += 0.22
             if wants_bnss and ("bnss" in haystack or "bharatiya nagarik suraksha sanhita" in haystack):
                 adjusted += 0.22
+            if wants_ipc and ("ipc" in haystack or "indian penal code" in haystack):
+                adjusted += 0.22
+            if wants_crpc and ("crpc" in haystack or "code of criminal procedure" in haystack):
+                adjusted += 0.22
+            if wants_dpdp and ("dpdp" in haystack or "digital personal data protection" in haystack):
+                adjusted += 0.24
             if (wants_bns or wants_bnss) and "ipc" in haystack and not wants_ipc_compare:
                 adjusted -= 0.06
+            if wants_ipc and ("bns" in haystack or "bharatiya nyaya sanhita" in haystack) and not wants_ipc_compare:
+                adjusted -= 0.08
             if re.search(r"\|\s*section\s+\d+\(\d+[a-z]?\)", item.get("citation", ""), flags=re.IGNORECASE):
                 adjusted += 0.04
             if item.get("reference_path"):
@@ -647,3 +702,15 @@ class Retriever:
 
     def _citation_contains(self, item: dict, needle: str) -> bool:
         return needle.lower() in str(item.get("citation", "")).lower()
+
+    def _cache_get(self, cache: OrderedDict, key):
+        if key not in cache:
+            return None
+        cache.move_to_end(key)
+        return cache[key]
+
+    def _cache_set(self, cache: OrderedDict, key, value, max_items: int) -> None:
+        cache[key] = value
+        cache.move_to_end(key)
+        while len(cache) > max(8, int(max_items)):
+            cache.popitem(last=False)

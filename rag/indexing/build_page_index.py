@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import argparse
-import json
 import sys
 from pathlib import Path
 
@@ -13,11 +12,8 @@ if str(BACKEND_ROOT) not in sys.path:
     sys.path.insert(0, str(BACKEND_ROOT))
 
 from app.core.config import get_settings
+from app.services.corpus_records import load_legal_corpus_records
 from app.services.page_index import PageIndexStore
-
-
-def load_corpus(path: Path) -> list[dict]:
-    return [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
 
 
 def main() -> None:
@@ -31,7 +27,7 @@ def main() -> None:
     if not corpus_path.exists():
         corpus_path = Path(settings.bootstrap_corpus_path)
 
-    records = load_corpus(corpus_path)
+    records = load_legal_corpus_records(settings, corpus_path)
     if not records:
         raise SystemExit(f"No corpus rows found at {corpus_path}")
 

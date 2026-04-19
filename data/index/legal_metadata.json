@@ -41224,5 +41224,497 @@
     "linked_citations": [],
     "chunk_strategy": "statute_section",
     "chunk_size": 102
+  },
+  {
+    "chunk_id": "ipc_379_punishment_for_theft",
+    "document_id": "ipc_1860_supplemental",
+    "source_id": "ipc_1860",
+    "title": "Indian Penal Code, 1860",
+    "citation": "Act No. 45 of 1860 | Section 379",
+    "source_type": "statute",
+    "document_type": "act",
+    "jurisdiction": "India",
+    "language": "en",
+    "source_url": "https://www.indiacode.nic.in/handle/123456789/12850",
+    "text": "Section 379. Punishment for theft. This provision deals with punishment for theft under the Indian Penal Code, 1860.",
+    "summary": "Punishment for theft under the Indian Penal Code, 1860.",
+    "linked_citations": [
+      "Act No. 45 of 1860 | Section 378"
+    ],
+    "chunk_strategy": "supplemental_section"
+  },
+  {
+    "chunk_id": "ipc_406_punishment_for_criminal_breach_of_trust",
+    "document_id": "ipc_1860_supplemental",
+    "source_id": "ipc_1860",
+    "title": "Indian Penal Code, 1860",
+    "citation": "Act No. 45 of 1860 | Section 406",
+    "source_type": "statute",
+    "document_type": "act",
+    "jurisdiction": "India",
+    "language": "en",
+    "source_url": "https://www.indiacode.nic.in/handle/123456789/12850",
+    "text": "Section 406. Punishment for criminal breach of trust. This provision deals with punishment for criminal breach of trust under the Indian Penal Code, 1860.",
+    "summary": "Punishment for criminal breach of trust under the Indian Penal Code, 1860.",
+    "linked_citations": [
+      "Act No. 45 of 1860 | Section 405"
+    ],
+    "chunk_strategy": "supplemental_section"
+  },
+  {
+    "chunk_id": "ipc_420_cheating_and_dishonestly_inducing_delivery_of_property",
+    "document_id": "ipc_1860_supplemental",
+    "source_id": "ipc_1860",
+    "title": "Indian Penal Code, 1860",
+    "citation": "Act No. 45 of 1860 | Section 420",
+    "source_type": "statute",
+    "document_type": "act",
+    "jurisdiction": "India",
+    "language": "en",
+    "source_url": "https://www.indiacode.nic.in/handle/123456789/12850",
+    "text": "Section 420. Cheating and dishonestly inducing delivery of property. This provision deals with cheating and dishonestly inducing delivery of property under the Indian Penal Code, 1860.",
+    "summary": "Cheating and dishonestly inducing delivery of property under the Indian Penal Code, 1860.",
+    "linked_citations": [
+      "Act No. 45 of 1860 | Section 415"
+    ],
+    "chunk_strategy": "supplemental_section"
+  },
+  {
+    "chunk_id": "ipc_499_defamation",
+    "document_id": "ipc_1860_supplemental",
+    "source_id": "ipc_1860",
+    "title": "Indian Penal Code, 1860",
+    "citation": "Act No. 45 of 1860 | Section 499",
+    "source_type": "statute",
+    "document_type": "act",
+    "jurisdiction": "India",
+    "language": "en",
+    "source_url": "https://www.indiacode.nic.in/handle/123456789/12850",
+    "text": "Section 499. Defamation. This provision deals with defamation under the Indian Penal Code, 1860.",
+    "summary": "Defamation under the Indian Penal Code, 1860.",
+    "linked_citations": [
+      "Act No. 45 of 1860 | Section 500"
+    ],
+    "chunk_strategy": "supplemental_section"
+  },
+  {
+    "chunk_id": "ipc_503_criminal_intimidation",
+    "document_id": "ipc_1860_supplemental",
+    "source_id": "ipc_1860",
+    "title": "Indian Penal Code, 1860",
+    "citation": "Act No. 45 of 1860 | Section 503",
+    "source_type": "statute",
+    "document_type": "act",
+    "jurisdiction": "India",
+    "language": "en",
+    "source_url": "https://www.indiacode.nic.in/handle/123456789/12850",
+    "text": "Section 503. Criminal intimidation. This provision deals with criminal intimidation under the Indian Penal Code, 1860.",
+    "summary": "Criminal intimidation under the Indian Penal Code, 1860.",
+    "linked_citations": [
+      "Act No. 45 of 1860 | Section 506"
+    ],
+    "chunk_strategy": "supplemental_section"
+  },
+  {
+    "chunk_id": "ipc_506_punishment_for_criminal_intimidation",
+    "document_id": "ipc_1860_supplemental",
+    "source_id": "ipc_1860",
+    "title": "Indian Penal Code, 1860",
+    "citation": "Act No. 45 of 1860 | Section 506",
+    "source_type": "statute",
+    "document_type": "act",
+    "jurisdiction": "India",
+    "language": "en",
+    "source_url": "https://www.indiacode.nic.in/handle/123456789/12850",
+    "text": "Section 506. Punishment for criminal intimidation. This provision deals with punishment for criminal intimidation under the Indian Penal Code, 1860.",
+    "summary": "Punishment for criminal intimidation under the Indian Penal Code, 1860.",
+    "linked_citations": [
+      "Act No. 45 of 1860 | Section 503"
+    ],
+    "chunk_strategy": "supplemental_section"
+  },
+  {
+    "chunk_id": "ipc_509_insult_modesty_of_woman",
+    "document_id": "ipc_1860_supplemental",
+    "source_id": "ipc_1860",
+    "title": "Indian Penal Code, 1860",
+    "citation": "Act No. 45 of 1860 | Section 509",
+    "source_type": "statute",
+    "document_type": "act",
+    "jurisdiction": "India",
+    "language": "en",
+    "source_url": "https://www.indiacode.nic.in/handle/123456789/12850",
+    "text": "Section 509. Word, gesture or act intended to insult the modesty of a woman. This provision deals with insulting the modesty of a woman under the Indian Penal Code, 1860.",
+    "summary": "Word, gesture or act intended to insult the modesty of a woman under the Indian Penal Code, 1860.",
+    "linked_citations": [],
+    "chunk_strategy": "supplemental_section"
+  },
+  {
+    "chunk_id": "crpc_154_information_in_cognizable_cases",
+    "document_id": "crpc_1973_supplemental",
+    "source_id": "crpc_1973",
+    "title": "Code of Criminal Procedure, 1973",
+    "citation": "Act No. 2 of 1974 | Section 154",
+    "source_type": "statute",
+    "document_type": "act",
+    "jurisdiction": "India",
+    "language": "en",
+    "source_url": "https://www.indiacode.nic.in/handle/123456789/15247",
+    "text": "Section 154. Information in cognizable cases. This provision deals with recording information relating to cognizable offences under the Code of Criminal Procedure, 1973.",
+    "summary": "Information in cognizable cases under the Code of Criminal Procedure, 1973.",
+    "linked_citations": [
+      "Act No. 2 of 1974 | Section 156",
+      "Act No. 2 of 1974 | Section 190"
+    ],
+    "chunk_strategy": "supplemental_section"
+  },
+  {
+    "chunk_id": "crpc_156_police_power_to_investigate_cognizable_case",
+    "document_id": "crpc_1973_supplemental",
+    "source_id": "crpc_1973",
+    "title": "Code of Criminal Procedure, 1973",
+    "citation": "Act No. 2 of 1974 | Section 156",
+    "source_type": "statute",
+    "document_type": "act",
+    "jurisdiction": "India",
+    "language": "en",
+    "source_url": "https://www.indiacode.nic.in/handle/123456789/15247",
+    "text": "Section 156. Police officer's power to investigate cognizable case. This provision deals with police investigation of cognizable offences under the Code of Criminal Procedure, 1973.",
+    "summary": "Police officer's power to investigate cognizable case under the Code of Criminal Procedure, 1973.",
+    "linked_citations": [
+      "Act No. 2 of 1974 | Section 154",
+      "Act No. 2 of 1974 | Section 173"
+    ],
+    "chunk_strategy": "supplemental_section"
+  },
+  {
+    "chunk_id": "crpc_160_attendance_of_witnesses",
+    "document_id": "crpc_1973_supplemental",
+    "source_id": "crpc_1973",
+    "title": "Code of Criminal Procedure, 1973",
+    "citation": "Act No. 2 of 1974 | Section 160",
+    "source_type": "statute",
+    "document_type": "act",
+    "jurisdiction": "India",
+    "language": "en",
+    "source_url": "https://www.indiacode.nic.in/handle/123456789/15247",
+    "text": "Section 160. Police officer's power to require attendance of witnesses. This provision deals with requiring the attendance of witnesses during investigation under the Code of Criminal Procedure, 1973.",
+    "summary": "Police officer's power to require attendance of witnesses under the Code of Criminal Procedure, 1973.",
+    "linked_citations": [
+      "Act No. 2 of 1974 | Section 161"
+    ],
+    "chunk_strategy": "supplemental_section"
+  },
+  {
+    "chunk_id": "crpc_161_examination_of_witnesses",
+    "document_id": "crpc_1973_supplemental",
+    "source_id": "crpc_1973",
+    "title": "Code of Criminal Procedure, 1973",
+    "citation": "Act No. 2 of 1974 | Section 161",
+    "source_type": "statute",
+    "document_type": "act",
+    "jurisdiction": "India",
+    "language": "en",
+    "source_url": "https://www.indiacode.nic.in/handle/123456789/15247",
+    "text": "Section 161. Examination of witnesses by police. This provision deals with police examination of witnesses during investigation under the Code of Criminal Procedure, 1973.",
+    "summary": "Examination of witnesses by police under the Code of Criminal Procedure, 1973.",
+    "linked_citations": [
+      "Act No. 2 of 1974 | Section 162"
+    ],
+    "chunk_strategy": "supplemental_section"
+  },
+  {
+    "chunk_id": "crpc_164_recording_of_confessions_and_statements",
+    "document_id": "crpc_1973_supplemental",
+    "source_id": "crpc_1973",
+    "title": "Code of Criminal Procedure, 1973",
+    "citation": "Act No. 2 of 1974 | Section 164",
+    "source_type": "statute",
+    "document_type": "act",
+    "jurisdiction": "India",
+    "language": "en",
+    "source_url": "https://www.indiacode.nic.in/handle/123456789/15247",
+    "text": "Section 164. Recording of confessions and statements. This provision deals with recording confessions and statements under the Code of Criminal Procedure, 1973.",
+    "summary": "Recording of confessions and statements under the Code of Criminal Procedure, 1973.",
+    "linked_citations": [],
+    "chunk_strategy": "supplemental_section"
+  },
+  {
+    "chunk_id": "crpc_167_investigation_cannot_be_completed_in_24_hours",
+    "document_id": "crpc_1973_supplemental",
+    "source_id": "crpc_1973",
+    "title": "Code of Criminal Procedure, 1973",
+    "citation": "Act No. 2 of 1974 | Section 167",
+    "source_type": "statute",
+    "document_type": "act",
+    "jurisdiction": "India",
+    "language": "en",
+    "source_url": "https://www.indiacode.nic.in/handle/123456789/15247",
+    "text": "Section 167. Procedure when investigation cannot be completed in twenty-four hours. This provision deals with remand and further custody during investigation under the Code of Criminal Procedure, 1973.",
+    "summary": "Procedure when investigation cannot be completed in twenty-four hours under the Code of Criminal Procedure, 1973.",
+    "linked_citations": [
+      "Act No. 2 of 1974 | Section 173"
+    ],
+    "chunk_strategy": "supplemental_section"
+  },
+  {
+    "chunk_id": "crpc_173_report_of_police_officer_on_completion_of_investigation",
+    "document_id": "crpc_1973_supplemental",
+    "source_id": "crpc_1973",
+    "title": "Code of Criminal Procedure, 1973",
+    "citation": "Act No. 2 of 1974 | Section 173",
+    "source_type": "statute",
+    "document_type": "act",
+    "jurisdiction": "India",
+    "language": "en",
+    "source_url": "https://www.indiacode.nic.in/handle/123456789/15247",
+    "text": "Section 173. Report of police officer on completion of investigation. This provision deals with the police report after investigation under the Code of Criminal Procedure, 1973.",
+    "summary": "Report of police officer on completion of investigation under the Code of Criminal Procedure, 1973.",
+    "linked_citations": [
+      "Act No. 2 of 1974 | Section 154",
+      "Act No. 2 of 1974 | Section 156"
+    ],
+    "chunk_strategy": "supplemental_section"
+  },
+  {
+    "chunk_id": "crpc_190_cognizance_by_magistrates",
+    "document_id": "crpc_1973_supplemental",
+    "source_id": "crpc_1973",
+    "title": "Code of Criminal Procedure, 1973",
+    "citation": "Act No. 2 of 1974 | Section 190",
+    "source_type": "statute",
+    "document_type": "act",
+    "jurisdiction": "India",
+    "language": "en",
+    "source_url": "https://www.indiacode.nic.in/handle/123456789/15247",
+    "text": "Section 190. Cognizance of offences by Magistrates. This provision deals with cognizance by Magistrates under the Code of Criminal Procedure, 1973.",
+    "summary": "Cognizance of offences by Magistrates under the Code of Criminal Procedure, 1973.",
+    "linked_citations": [
+      "Act No. 2 of 1974 | Section 154",
+      "Act No. 2 of 1974 | Section 200"
+    ],
+    "chunk_strategy": "supplemental_section"
+  },
+  {
+    "chunk_id": "crpc_438_anticipatory_bail",
+    "document_id": "crpc_1973_supplemental",
+    "source_id": "crpc_1973",
+    "title": "Code of Criminal Procedure, 1973",
+    "citation": "Act No. 2 of 1974 | Section 438",
+    "source_type": "statute",
+    "document_type": "act",
+    "jurisdiction": "India",
+    "language": "en",
+    "source_url": "https://www.indiacode.nic.in/handle/123456789/15247",
+    "text": "Section 438. Direction for grant of bail to person apprehending arrest. This provision deals with anticipatory bail under the Code of Criminal Procedure, 1973.",
+    "summary": "Direction for grant of bail to person apprehending arrest under the Code of Criminal Procedure, 1973.",
+    "linked_citations": [
+      "Act No. 2 of 1974 | Section 439"
+    ],
+    "chunk_strategy": "supplemental_section"
+  },
+  {
+    "chunk_id": "crpc_439_special_powers_regarding_bail",
+    "document_id": "crpc_1973_supplemental",
+    "source_id": "crpc_1973",
+    "title": "Code of Criminal Procedure, 1973",
+    "citation": "Act No. 2 of 1974 | Section 439",
+    "source_type": "statute",
+    "document_type": "act",
+    "jurisdiction": "India",
+    "language": "en",
+    "source_url": "https://www.indiacode.nic.in/handle/123456789/15247",
+    "text": "Section 439. Special powers of High Court or Court of Session regarding bail. This provision deals with bail powers of the High Court and Court of Session under the Code of Criminal Procedure, 1973.",
+    "summary": "Special powers of High Court or Court of Session regarding bail under the Code of Criminal Procedure, 1973.",
+    "linked_citations": [
+      "Act No. 2 of 1974 | Section 437",
+      "Act No. 2 of 1974 | Section 438"
+    ],
+    "chunk_strategy": "supplemental_section"
+  },
+  {
+    "chunk_id": "dpdp_2023_section_3_application_of_act",
+    "document_id": "dpdp_2023_supplemental",
+    "source_id": "dpdp_2023",
+    "title": "The Digital Personal Data Protection Act, 2023",
+    "citation": "Act No. 22 of 2023 | Section 3",
+    "source_type": "statute",
+    "document_type": "act",
+    "jurisdiction": "India",
+    "language": "en",
+    "source_url": "https://www.indiacode.nic.in/handle/123456789/22037?view_type=browse",
+    "text": "Section 3. Application of Act. This provision deals with the application of the Digital Personal Data Protection Act, 2023.",
+    "summary": "Application of the Digital Personal Data Protection Act, 2023.",
+    "linked_citations": [
+      "Act No. 22 of 2023 | Section 4"
+    ],
+    "chunk_strategy": "supplemental_section"
+  },
+  {
+    "chunk_id": "dpdp_2023_section_4_grounds_for_processing_personal_data",
+    "document_id": "dpdp_2023_supplemental",
+    "source_id": "dpdp_2023",
+    "title": "The Digital Personal Data Protection Act, 2023",
+    "citation": "Act No. 22 of 2023 | Section 4",
+    "source_type": "statute",
+    "document_type": "act",
+    "jurisdiction": "India",
+    "language": "en",
+    "source_url": "https://www.indiacode.nic.in/handle/123456789/22037?view_type=browse",
+    "text": "Section 4. Grounds for processing personal data. This provision deals with the grounds for processing personal data under the Digital Personal Data Protection Act, 2023.",
+    "summary": "Grounds for processing personal data under the Digital Personal Data Protection Act, 2023.",
+    "linked_citations": [
+      "Act No. 22 of 2023 | Section 6",
+      "Act No. 22 of 2023 | Section 7"
+    ],
+    "chunk_strategy": "supplemental_section"
+  },
+  {
+    "chunk_id": "dpdp_2023_section_6_consent",
+    "document_id": "dpdp_2023_supplemental",
+    "source_id": "dpdp_2023",
+    "title": "The Digital Personal Data Protection Act, 2023",
+    "citation": "Act No. 22 of 2023 | Section 6",
+    "source_type": "statute",
+    "document_type": "act",
+    "jurisdiction": "India",
+    "language": "en",
+    "source_url": "https://www.indiacode.nic.in/handle/123456789/22037?view_type=browse",
+    "text": "Section 6. Consent. This provision deals with consent under the Digital Personal Data Protection Act, 2023.",
+    "summary": "Consent under the Digital Personal Data Protection Act, 2023.",
+    "linked_citations": [
+      "Act No. 22 of 2023 | Section 5",
+      "Act No. 22 of 2023 | Section 7"
+    ],
+    "chunk_strategy": "supplemental_section"
+  },
+  {
+    "chunk_id": "dpdp_2023_section_8_general_obligations_of_data_fiduciary",
+    "document_id": "dpdp_2023_supplemental",
+    "source_id": "dpdp_2023",
+    "title": "The Digital Personal Data Protection Act, 2023",
+    "citation": "Act No. 22 of 2023 | Section 8",
+    "source_type": "statute",
+    "document_type": "act",
+    "jurisdiction": "India",
+    "language": "en",
+    "source_url": "https://www.indiacode.nic.in/handle/123456789/22037?view_type=browse",
+    "text": "Section 8. General obligations of Data Fiduciary. This provision deals with the general obligations of a Data Fiduciary under the Digital Personal Data Protection Act, 2023.",
+    "summary": "General obligations of Data Fiduciary under the Digital Personal Data Protection Act, 2023.",
+    "linked_citations": [
+      "Act No. 22 of 2023 | Section 10"
+    ],
+    "chunk_strategy": "supplemental_section"
+  },
+  {
+    "chunk_id": "dpdp_2023_section_11_right_to_access_information_about_personal_data",
+    "document_id": "dpdp_2023_supplemental",
+    "source_id": "dpdp_2023",
+    "title": "The Digital Personal Data Protection Act, 2023",
+    "citation": "Act No. 22 of 2023 | Section 11",
+    "source_type": "statute",
+    "document_type": "act",
+    "jurisdiction": "India",
+    "language": "en",
+    "source_url": "https://www.indiacode.nic.in/handle/123456789/22037?view_type=browse",
+    "text": "Section 11. Right to access information about personal data. This provision deals with the right to access information about personal data under the Digital Personal Data Protection Act, 2023.",
+    "summary": "Right to access information about personal data under the Digital Personal Data Protection Act, 2023.",
+    "linked_citations": [
+      "Act No. 22 of 2023 | Section 12",
+      "Act No. 22 of 2023 | Section 13"
+    ],
+    "chunk_strategy": "supplemental_section"
+  },
+  {
+    "chunk_id": "dpdp_2023_section_12_right_to_correction_and_erasure",
+    "document_id": "dpdp_2023_supplemental",
+    "source_id": "dpdp_2023",
+    "title": "The Digital Personal Data Protection Act, 2023",
+    "citation": "Act No. 22 of 2023 | Section 12",
+    "source_type": "statute",
+    "document_type": "act",
+    "jurisdiction": "India",
+    "language": "en",
+    "source_url": "https://www.indiacode.nic.in/handle/123456789/22037?view_type=browse",
+    "text": "Section 12. Right to correction and erasure of personal data. This provision deals with correction and erasure rights under the Digital Personal Data Protection Act, 2023.",
+    "summary": "Right to correction and erasure of personal data under the Digital Personal Data Protection Act, 2023.",
+    "linked_citations": [
+      "Act No. 22 of 2023 | Section 11",
+      "Act No. 22 of 2023 | Section 13"
+    ],
+    "chunk_strategy": "supplemental_section"
+  },
+  {
+    "chunk_id": "dpdp_2023_section_13_right_of_grievance_redressal",
+    "document_id": "dpdp_2023_supplemental",
+    "source_id": "dpdp_2023",
+    "title": "The Digital Personal Data Protection Act, 2023",
+    "citation": "Act No. 22 of 2023 | Section 13",
+    "source_type": "statute",
+    "document_type": "act",
+    "jurisdiction": "India",
+    "language": "en",
+    "source_url": "https://www.indiacode.nic.in/handle/123456789/22037?view_type=browse",
+    "text": "Section 13. Right of grievance redressal. This provision deals with grievance redressal under the Digital Personal Data Protection Act, 2023.",
+    "summary": "Right of grievance redressal under the Digital Personal Data Protection Act, 2023.",
+    "linked_citations": [
+      "Act No. 22 of 2023 | Section 11",
+      "Act No. 22 of 2023 | Section 12"
+    ],
+    "chunk_strategy": "supplemental_section"
+  },
+  {
+    "chunk_id": "dpdp_2023_section_17_exemptions",
+    "document_id": "dpdp_2023_supplemental",
+    "source_id": "dpdp_2023",
+    "title": "The Digital Personal Data Protection Act, 2023",
+    "citation": "Act No. 22 of 2023 | Section 17",
+    "source_type": "statute",
+    "document_type": "act",
+    "jurisdiction": "India",
+    "language": "en",
+    "source_url": "https://www.indiacode.nic.in/handle/123456789/22037?view_type=browse",
+    "text": "Section 17. Exemptions. This provision deals with exemptions under the Digital Personal Data Protection Act, 2023.",
+    "summary": "Exemptions under the Digital Personal Data Protection Act, 2023.",
+    "linked_citations": [
+      "Act No. 22 of 2023 | Section 38"
+    ],
+    "chunk_strategy": "supplemental_section"
+  },
+  {
+    "chunk_id": "dpdp_2023_section_33_penalties",
+    "document_id": "dpdp_2023_supplemental",
+    "source_id": "dpdp_2023",
+    "title": "The Digital Personal Data Protection Act, 2023",
+    "citation": "Act No. 22 of 2023 | Section 33",
+    "source_type": "statute",
+    "document_type": "act",
+    "jurisdiction": "India",
+    "language": "en",
+    "source_url": "https://www.indiacode.nic.in/handle/123456789/22037?view_type=browse",
+    "text": "Section 33. Penalties. This provision deals with penalties under the Digital Personal Data Protection Act, 2023.",
+    "summary": "Penalties under the Digital Personal Data Protection Act, 2023.",
+    "linked_citations": [
+      "Act No. 22 of 2023 | Schedule 1"
+    ],
+    "chunk_strategy": "supplemental_section"
+  },
+  {
+    "chunk_id": "dpdp_2023_section_38_consistency_with_other_laws",
+    "document_id": "dpdp_2023_supplemental",
+    "source_id": "dpdp_2023",
+    "title": "The Digital Personal Data Protection Act, 2023",
+    "citation": "Act No. 22 of 2023 | Section 38",
+    "source_type": "statute",
+    "document_type": "act",
+    "jurisdiction": "India",
+    "language": "en",
+    "source_url": "https://www.indiacode.nic.in/handle/123456789/22037?view_type=browse",
+    "text": "Section 38. Consistency with other laws. This provision deals with consistency with other laws under the Digital Personal Data Protection Act, 2023.",
+    "summary": "Consistency with other laws under the Digital Personal Data Protection Act, 2023.",
+    "linked_citations": [
+      "Act No. 22 of 2023 | Section 17"
+    ],
+    "chunk_strategy": "supplemental_section"
   }
 ]

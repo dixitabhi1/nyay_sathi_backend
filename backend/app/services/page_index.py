@@ -78,6 +78,13 @@ ACT_ALIASES = {
     "crpc": (
         "crpc",
         "code of criminal procedure",
+        "act no. 2 of 1974",
+    ),
+    "dpdp": (
+        "dpdp",
+        "digital personal data protection act",
+        "personal data protection act",
+        "act no. 22 of 2023",
     ),
     "contract_act": (
         "contract act",
@@ -95,6 +102,7 @@ ACT_TITLES = {
     "bsa": "Bharatiya Sakshya Adhiniyam, 2023",
     "ipc": "Indian Penal Code, 1860",
     "crpc": "Code of Criminal Procedure, 1973",
+    "dpdp": "Digital Personal Data Protection Act, 2023",
     "contract_act": "Indian Contract Act, 1872",
     "evidence_act": "Indian Evidence Act, 1872",
 }

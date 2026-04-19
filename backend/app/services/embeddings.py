@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections import OrderedDict
 from typing import Iterable
 
 import numpy as np
@@ -7,9 +8,9 @@ import numpy as np
 from app.core.config import Settings
 
 LEGAL_SCOPE_ANCHORS = [
-    "Indian legal question about FIR registration, police complaint, criminal law, BNS, IPC, BNSS, BSA, arrest, bail, evidence, and investigation.",
+    "Indian legal question about FIR registration, police complaint, criminal law, BNS, IPC, BNSS, CrPC, BSA, arrest, bail, evidence, and investigation.",
     "Indian civil or commercial legal question about contracts, legal notices, tenant rights, consumer protection, property disputes, compensation, and legal remedies.",
-    "Legal research request about statutes, bare acts, court judgments, legal drafting, legal procedure, rights, and compliance under Indian law.",
+    "Legal research request about statutes, bare acts, court judgments, legal drafting, legal procedure, rights, compliance, privacy, and data protection under Indian law including the DPDP Act 2023.",
 ]
 
 NON_LEGAL_SCOPE_ANCHORS = [
@@ -42,6 +43,7 @@ class EmbeddingService:
         self._model = None
         self._legal_scope_anchor_embeddings = None
         self._non_legal_scope_anchor_embeddings = None
+        self._query_cache: OrderedDict[str, np.ndarray] = OrderedDict()
 
     @property
     def model(self):
@@ -68,7 +70,17 @@ class EmbeddingService:
         return np.asarray(embeddings, dtype="float32")
 
     def encode_query(self, text: str) -> np.ndarray:
-        return self.encode([text])
+        normalized = " ".join(text.strip().split())
+        cached = self._query_cache.get(normalized)
+        if cached is not None:
+            self._query_cache.move_to_end(normalized)
+            return cached
+        embedding = self.encode([normalized])
+        self._query_cache[normalized] = embedding
+        max_items = max(16, int(self.settings.query_embedding_cache_size))
+        while len(self._query_cache) > max_items:
+            self._query_cache.popitem(last=False)
+        return embedding
 
     def max_similarity(self, query_vector: np.ndarray, candidate_vectors: np.ndarray) -> float:
         if candidate_vectors.size == 0:
