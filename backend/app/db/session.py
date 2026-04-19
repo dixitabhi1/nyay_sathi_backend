@@ -60,9 +60,9 @@ def _engine_responds(candidate_engine) -> bool:
 
 try:
     if (
-        settings.prefer_local_app_db_on_space
-        and settings.is_huggingface_space
+        settings.is_huggingface_space
         and settings.resolved_database_url.startswith("sqlite+libsql://")
+        and (settings.prefer_local_app_db_on_space or not settings.allow_remote_app_db_on_space)
     ):
         logger.warning("Running on Hugging Face Space with local app DB preference enabled. Using SQLite fallback.")
         engine = _build_sqlite_fallback_engine()

@@ -93,6 +93,7 @@ class Settings(BaseSettings):
     admin_emails: str = Field(default="", alias="ADMIN_EMAILS")
     database_probe_timeout_seconds: float = Field(default=4.0, alias="DATABASE_PROBE_TIMEOUT_SECONDS")
     prefer_local_app_db_on_space: bool = Field(default=True, alias="PREFER_LOCAL_APP_DB_ON_SPACE")
+    allow_remote_app_db_on_space: bool = Field(default=False, alias="ALLOW_REMOTE_APP_DB_ON_SPACE")
     persistent_storage_root: Path | None = Field(default=None, alias="PERSISTENT_STORAGE_ROOT")
     bootstrap_admin_password: str = Field(default="", alias="BOOTSTRAP_ADMIN_PASSWORD")
     bootstrap_admin_full_name: str = Field(default="NyayaSetu Admin", alias="BOOTSTRAP_ADMIN_FULL_NAME")
