@@ -84,20 +84,41 @@ class Retriever:
         self._scope_cache: OrderedDict[str, dict] = OrderedDict()
 
     def ensure_index(self) -> None:
+        force_rebuild = False
         if self.vector_store.exists() and self.page_index.exists():
-            self._warmup_embeddings()
-            return
+            if not self._index_missing_case_law_corpus():
+                self._warmup_embeddings()
+                return
+            force_rebuild = True
 
         corpus_path = Path(self.settings.legal_corpus_path)
         if not corpus_path.exists():
             corpus_path = Path(self.settings.bootstrap_corpus_path)
         documents = load_legal_corpus_records(self.settings, corpus_path)
-        if not self.vector_store.exists():
+        if force_rebuild or not self.vector_store.exists():
             embeddings = self.embeddings.encode(build_embedding_text(doc) for doc in documents)
             self.vector_store.build(embeddings, documents)
-        if not self.page_index.exists():
+        if force_rebuild or not self.page_index.exists():
             self.page_index.build(documents)
         self._warmup_embeddings()
+
+    def _index_missing_case_law_corpus(self) -> bool:
+        has_case_law_source = (
+            (Path(self.settings.legal_corpus_path).parent / "legal_case_law_corpus.jsonl").exists()
+            or bool(self.settings.remote_case_law_corpus_url.strip())
+            or self.settings.is_huggingface_space
+        )
+        if not has_case_law_source or not self.vector_store.metadata_path.exists():
+            return False
+        try:
+            metadata = json.loads(self.vector_store.metadata_path.read_text(encoding="utf-8"))
+        except Exception:
+            return True
+        return not any(
+            item.get("source_id") in {"indian_supreme_court_judgments_aws", "indian_high_court_judgments_aws"}
+            for item in metadata
+            if isinstance(item, dict)
+        )
 
     def ensure_ready(self) -> None:
         if not self.vector_store.exists() or not self.page_index.exists():
