@@ -78,8 +78,13 @@ try:
     else:
         engine = create_engine(settings.resolved_database_url, **engine_kwargs)
     if settings.resolved_database_url.startswith("sqlite+libsql://") and engine.url.drivername == "sqlite+libsql" and not _engine_responds(engine):
-        engine.dispose()
-        engine = _build_sqlite_fallback_engine()
+        if settings.is_huggingface_space and settings.allow_remote_app_db_on_space and not settings.prefer_local_app_db_on_space:
+            logger.warning(
+                "Database probe failed on Space, but remote app DB is enabled. Keeping the remote engine for runtime use.",
+            )
+        else:
+            engine.dispose()
+            engine = _build_sqlite_fallback_engine()
 except NoSuchModuleError:
     engine = _build_sqlite_fallback_engine()
 SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False, future=True)
