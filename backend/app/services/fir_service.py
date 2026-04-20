@@ -2,13 +2,14 @@ from __future__ import annotations
 
 import json
 from datetime import datetime
+import logging
 from pathlib import Path
 from uuid import uuid4
 
 from fastapi import HTTPException, UploadFile
 
 from app.core.config import Settings
-from app.db.session import SessionLocal
+from app.db.session import SessionLocal, init_db
 from app.models.auth import User
 from app.models.fir import FIREvidence, FIRIntelligence, FIRRecord, FIRVersion
 from app.schemas.fir import (
@@ -44,6 +45,9 @@ from app.services.fir_extraction import FIRExtractionService
 from app.services.fir_generation import FIRGenerationService
 from app.services.jurisdiction import JurisdictionService
 from app.services.legal_section_classifier import LegalSectionClassifier
+
+
+logger = logging.getLogger(__name__)
 
 
 class FIRService:
@@ -543,68 +547,94 @@ class FIRService:
             source_application_text=source_application_text,
         )
         draft_text = self._select_document_content(documents, normalized_draft_role)
-        now = datetime.utcnow()
-        record = FIRRecord(
-            id=fir_id,
+        for attempt in range(2):
+            now = datetime.utcnow()
+            record = FIRRecord(
+                id=fir_id,
+                workflow=workflow,
+                draft_role=normalized_draft_role,
+                draft_language=normalized_language,
+                status="draft",
+                extracted_payload=structured.model_dump_json(),
+                transcript_text=transcript_text,
+                suggested_sections=json.dumps([section.model_dump() for section in sections], ensure_ascii=True),
+                comparative_sections=comparative_sections.model_dump_json(),
+                legal_reasoning=legal_reasoning,
+                case_strength_score=score,
+                case_strength_reasoning=json.dumps(score_reasons, ensure_ascii=True),
+                disclaimer=AI_FIR_DISCLAIMER,
+                citizen_application_text=self._document_content(documents, "citizen_application"),
+                police_fir_text=self._document_content(documents, "police_fir"),
+                lawyer_analysis_text=self._document_content(documents, "lawyer_analysis"),
+                source_application_text=source_application_text,
+                current_draft=draft_text,
+                current_version=1,
+                user_id=user_id,
+                created_at=now,
+                updated_at=now,
+                last_edited_at=now,
+            )
+            session = SessionLocal()
+            try:
+                session.add(record)
+                session.add(
+                    FIRIntelligence(
+                        fir_id=fir_id,
+                        crime_category=sections[0].title if sections else "General Crime",
+                        incident_location=structured.incident_location,
+                        police_station=(jurisdiction.suggested_police_station if jurisdiction else structured.police_station),
+                        district=(jurisdiction.district if jurisdiction else None),
+                        state=(jurisdiction.state if jurisdiction else None),
+                        latitude=(jurisdiction.latitude if jurisdiction else None),
+                        longitude=(jurisdiction.longitude if jurisdiction else None),
+                        completeness_score=completeness.completeness_score,
+                        missing_fields=json.dumps(completeness.missing_fields, ensure_ascii=True),
+                        jurisdiction_payload=(jurisdiction.model_dump_json() if jurisdiction else None),
+                        created_at=now,
+                        updated_at=now,
+                    )
+                )
+                session.add(
+                    FIRVersion(
+                        fir_id=fir_id,
+                        version_number=1,
+                        document_kind=normalized_draft_role,
+                        language=normalized_language,
+                        draft_text=draft_text,
+                        edited_by=user_id,
+                        edit_summary="Initial AI-generated FIR draft",
+                    )
+                )
+                session.commit()
+                intelligence = session.get(FIRIntelligence, fir_id)
+                return self._serialize_record(record, [], intelligence, viewer=viewer)
+            except Exception as exc:
+                session.rollback()
+                if attempt == 0:
+                    logger.warning("FIR persistence failed for %s workflow, retrying after init_db(): %s", workflow, exc)
+                    init_db(force=True)
+                    continue
+                logger.exception("FIR persistence unavailable for %s workflow; returning transient response.", workflow)
+            finally:
+                session.close()
+
+        return self._build_transient_record_response(
             workflow=workflow,
-            draft_role=normalized_draft_role,
-            draft_language=normalized_language,
-            status="draft",
-            extracted_payload=structured.model_dump_json(),
+            structured=structured,
             transcript_text=transcript_text,
-            suggested_sections=json.dumps([section.model_dump() for section in sections], ensure_ascii=True),
-            comparative_sections=comparative_sections.model_dump_json(),
-            legal_reasoning=legal_reasoning,
-            case_strength_score=score,
-            case_strength_reasoning=json.dumps(score_reasons, ensure_ascii=True),
-            disclaimer=AI_FIR_DISCLAIMER,
-            citizen_application_text=self._document_content(documents, "citizen_application"),
-            police_fir_text=self._document_content(documents, "police_fir"),
-            lawyer_analysis_text=self._document_content(documents, "lawyer_analysis"),
             source_application_text=source_application_text,
-            current_draft=draft_text,
-            current_version=1,
-            user_id=user_id,
-            created_at=now,
-            updated_at=now,
-            last_edited_at=now,
+            requested_draft_role=normalized_draft_role,
+            draft_language=normalized_language,
+            sections=sections,
+            comparative_sections=comparative_sections,
+            legal_reasoning=legal_reasoning,
+            documents=documents,
+            jurisdiction=jurisdiction,
+            completeness=completeness,
+            score=score,
+            score_reasons=score_reasons,
+            viewer=viewer,
         )
-        session = SessionLocal()
-        try:
-            session.add(record)
-            session.add(
-                FIRIntelligence(
-                    fir_id=fir_id,
-                    crime_category=sections[0].title if sections else "General Crime",
-                    incident_location=structured.incident_location,
-                    police_station=(jurisdiction.suggested_police_station if jurisdiction else structured.police_station),
-                    district=(jurisdiction.district if jurisdiction else None),
-                    state=(jurisdiction.state if jurisdiction else None),
-                    latitude=(jurisdiction.latitude if jurisdiction else None),
-                    longitude=(jurisdiction.longitude if jurisdiction else None),
-                    completeness_score=completeness.completeness_score,
-                    missing_fields=json.dumps(completeness.missing_fields, ensure_ascii=True),
-                    jurisdiction_payload=(jurisdiction.model_dump_json() if jurisdiction else None),
-                    created_at=now,
-                    updated_at=now,
-                )
-            )
-            session.add(
-                FIRVersion(
-                    fir_id=fir_id,
-                    version_number=1,
-                    document_kind=normalized_draft_role,
-                    language=normalized_language,
-                    draft_text=draft_text,
-                    edited_by=user_id,
-                    edit_summary="Initial AI-generated FIR draft",
-                )
-            )
-            session.commit()
-            intelligence = session.get(FIRIntelligence, fir_id)
-            return self._serialize_record(record, [], intelligence, viewer=viewer)
-        finally:
-            session.close()
 
     def _attach_saved_evidence(self, fir_id: str, file_name: str, file_path: str, media_type: str) -> None:
         session = SessionLocal()
@@ -718,6 +748,57 @@ class FIRService:
                 )
             )
         return documents
+
+    def _build_transient_record_response(
+        self,
+        workflow: str,
+        structured: FIRStructuredData,
+        transcript_text: str | None,
+        source_application_text: str | None,
+        requested_draft_role: str,
+        draft_language: str,
+        sections: list[FIRSectionSuggestion],
+        comparative_sections: FIRComparativeSectionsResponse | None,
+        legal_reasoning: str,
+        documents: list[FIRGeneratedDocument],
+        jurisdiction: FIRJurisdictionSuggestion | None,
+        completeness: FIRCompletenessResponse,
+        score: int,
+        score_reasons: list[str],
+        viewer: User | None,
+    ) -> FIRRecordResponse:
+        visible_draft_role, visible_draft_text, visible_documents = self._prepare_documents_for_viewer(
+            documents,
+            requested_draft_role,
+            viewer,
+        )
+        storage_notice = (
+            "NyayaSetu generated this FIR draft, but temporary storage is unavailable right now. "
+            "Please download the draft and try saving again shortly."
+        )
+        return FIRRecordResponse(
+            fir_id="",
+            workflow=workflow,
+            draft_role=visible_draft_role,
+            draft_language=draft_language,
+            status="generated_not_saved",
+            extracted_data=structured,
+            transcript_text=transcript_text,
+            source_application_text=source_application_text,
+            sections=sections,
+            comparative_sections=comparative_sections,
+            legal_reasoning=f"{legal_reasoning}\n\n{storage_notice}",
+            draft_text=visible_draft_text,
+            generated_documents=visible_documents,
+            disclaimer=AI_FIR_DISCLAIMER,
+            jurisdiction=jurisdiction,
+            completeness=completeness,
+            case_strength_score=score,
+            case_strength_reasoning=score_reasons + [storage_notice],
+            evidence_items=[],
+            current_version=0,
+            last_edited_at=datetime.utcnow().isoformat(),
+        )
 
     def _prepare_documents_for_viewer(
         self,

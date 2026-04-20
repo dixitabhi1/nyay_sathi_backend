@@ -98,8 +98,10 @@ def get_db() -> Generator:
         db.close()
 
 
-def init_db() -> None:
+def init_db(force: bool = False) -> None:
     global _db_initialized
+    if force:
+        _db_initialized = False
     if _db_initialized:
         return
     with _db_init_lock:
