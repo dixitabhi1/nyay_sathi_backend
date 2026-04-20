@@ -147,24 +147,30 @@ def init_db() -> None:
 
 
 def _ensure_column(table_name: str, column_name: str, ddl: str) -> None:
-    inspector = inspect(engine)
-    if table_name not in inspector.get_table_names():
-        return
-    column_names = {column["name"] for column in inspector.get_columns(table_name)}
-    if column_name in column_names:
-        return
-    with engine.begin() as connection:
-        connection.exec_driver_sql(f"ALTER TABLE {table_name} ADD COLUMN {column_name} {ddl}")
+    try:
+        inspector = inspect(engine)
+        if table_name not in inspector.get_table_names():
+            return
+        column_names = {column["name"] for column in inspector.get_columns(table_name)}
+        if column_name in column_names:
+            return
+        with engine.begin() as connection:
+            connection.exec_driver_sql(f"ALTER TABLE {table_name} ADD COLUMN {column_name} {ddl}")
+    except Exception as exc:  # pragma: no cover - defensive migration guard for hosted DBs
+        logger.warning("Skipping column migration %s.%s: %s", table_name, column_name, exc)
 
 
 def _ensure_index(index_name: str, table_name: str, columns: list[str], unique: bool = False) -> None:
-    inspector = inspect(engine)
-    if table_name not in inspector.get_table_names():
-        return
-    existing_indexes = {index["name"] for index in inspector.get_indexes(table_name)}
-    if index_name in existing_indexes:
-        return
-    unique_sql = "UNIQUE " if unique else ""
-    column_sql = ", ".join(columns)
-    with engine.begin() as connection:
-        connection.exec_driver_sql(f"CREATE {unique_sql}INDEX IF NOT EXISTS {index_name} ON {table_name} ({column_sql})")
+    try:
+        inspector = inspect(engine)
+        if table_name not in inspector.get_table_names():
+            return
+        existing_indexes = {index["name"] for index in inspector.get_indexes(table_name)}
+        if index_name in existing_indexes:
+            return
+        unique_sql = "UNIQUE " if unique else ""
+        column_sql = ", ".join(columns)
+        with engine.begin() as connection:
+            connection.exec_driver_sql(f"CREATE {unique_sql}INDEX IF NOT EXISTS {index_name} ON {table_name} ({column_sql})")
+    except Exception as exc:  # pragma: no cover - defensive migration guard for hosted DBs
+        logger.warning("Skipping index migration %s on %s: %s", index_name, table_name, exc)
