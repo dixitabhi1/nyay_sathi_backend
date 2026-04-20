@@ -27,6 +27,9 @@ ACTION_CATEGORY_MAP = {
     "fir.update_draft": "fir",
     "fir.evidence": "fir",
 }
+CATEGORY_ACTIONS_MAP: dict[str, set[str]] = {}
+for action_name, category_name in ACTION_CATEGORY_MAP.items():
+    CATEGORY_ACTIONS_MAP.setdefault(category_name, set()).add(action_name)
 
 logger = logging.getLogger(__name__)
 
@@ -40,16 +43,32 @@ class UserHistoryService:
                 .filter(AuditLog.user_id == user_id)
                 .order_by(AuditLog.created_at.desc())
             )
-            rows = query.limit(max(1, min(limit, 200))).all()
-            items = [self._to_item(row) for row in rows]
             if category:
-                items = [item for item in items if item.category == category]
+                allowed_actions = CATEGORY_ACTIONS_MAP.get(category.strip().lower())
+                if allowed_actions:
+                    query = query.filter(AuditLog.action.in_(sorted(allowed_actions)))
+            rows = query.limit(max(1, min(limit, 200))).all()
+            items: list[UserHistoryItem] = []
+            for row in rows:
+                item = self._safe_to_item(row)
+                if item is None:
+                    continue
+                if category and item.category != category:
+                    continue
+                items.append(item)
             return UserHistoryResponse(items=items[:limit])
         except SQLAlchemyError as exc:
             logger.warning("History lookup failed for user %s: %s", user_id, exc)
             return UserHistoryResponse(items=[])
         finally:
             session.close()
+
+    def _safe_to_item(self, row: AuditLog) -> UserHistoryItem | None:
+        try:
+            return self._to_item(row)
+        except Exception as exc:
+            logger.warning("Skipping malformed history row %s: %s", getattr(row, "id", "?"), exc)
+            return None
 
     def _to_item(self, row: AuditLog) -> UserHistoryItem:
         input_payload = self._load_json(row.input_payload)
@@ -90,7 +109,9 @@ class UserHistoryService:
         if action == "documents.template_publish":
             return f"Published: {input_payload.get('title', 'Document template')}"[:80]
         if action == "documents.template_checkout":
-            return f"Document order #{output_payload.get('order', {}).get('id', '')}".strip()
+            order = output_payload.get("order", {})
+            order_id = order.get("id", "") if isinstance(order, dict) else ""
+            return f"Document order #{order_id}".strip()
         if action == "documents.template_verify_payment":
             return f"Unlocked document order #{input_payload.get('order_id', '')}".strip()
         if action.startswith("fir."):
@@ -116,7 +137,7 @@ class UserHistoryService:
                 return str(value)[:200]
         if action.startswith("documents.template_"):
             order = output_payload.get("order", output_payload)
-            generated = order.get("generated_document_text")
+            generated = order.get("generated_document_text") if isinstance(order, dict) else None
             if generated:
                 return str(generated)[:200]
         return None
