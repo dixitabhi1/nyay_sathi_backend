@@ -2,11 +2,11 @@ import logging
 
 from fastapi import APIRouter, Depends
 
+from app.db.session import init_db
 from app.core.security import get_current_user
 from app.models.auth import User
 from app.schemas.history import UserHistoryResponse
 from app.services.history import UserHistoryService
-from app.core.dependencies import get_history_service
 
 
 router = APIRouter()
@@ -18,9 +18,10 @@ def list_history(
     category: str | None = None,
     limit: int = 50,
     current_user: User = Depends(get_current_user),
-    history_service: UserHistoryService = Depends(get_history_service),
 ) -> UserHistoryResponse:
     try:
+        init_db()
+        history_service = UserHistoryService()
         return history_service.list_history(current_user.id, category=category, limit=limit)
     except Exception as exc:  # pragma: no cover - final protection for hosted runtime edge cases
         logger.warning("History route fallback for user %s: %s", current_user.id, exc)
