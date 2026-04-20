@@ -131,11 +131,18 @@ def init_db() -> None:
         _ensure_column("fir_records", "source_application_text", "TEXT")
         _ensure_column("fir_versions", "document_kind", "VARCHAR(48) NOT NULL DEFAULT 'citizen_application'")
         _ensure_column("fir_versions", "language", "VARCHAR(32) NOT NULL DEFAULT 'en'")
+        _ensure_column("audit_logs", "action", "VARCHAR(128) NOT NULL DEFAULT 'unknown'")
+        _ensure_column("audit_logs", "user_id", "VARCHAR(128)")
+        _ensure_column("audit_logs", "input_payload", "TEXT NOT NULL DEFAULT '{}'")
+        _ensure_column("audit_logs", "output_payload", "TEXT NOT NULL DEFAULT '{}'")
+        _ensure_column("audit_logs", "created_at", "DATETIME")
         _ensure_index("ix_users_email_fast_lookup", "users", ["email"], unique=True)
         _ensure_index("ix_users_role_approval_lookup", "users", ["requested_role", "approval_status"])
         _ensure_index("ix_auth_sessions_token_hash_fast_lookup", "auth_sessions", ["token_hash"], unique=True)
         _ensure_index("ix_auth_sessions_user_id_created_at", "auth_sessions", ["user_id", "created_at"])
         _ensure_index("ix_auth_sessions_revoked_expires", "auth_sessions", ["revoked_at", "expires_at"])
+        _ensure_index("ix_audit_logs_user_created_at", "audit_logs", ["user_id", "created_at"])
+        _ensure_index("ix_audit_logs_action_created_at", "audit_logs", ["action", "created_at"])
         _db_initialized = True
 
 

@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 import json
+import logging
 
 from app.db.session import SessionLocal
 from app.models.audit import AuditLog
 from app.schemas.history import UserHistoryItem, UserHistoryResponse
+from sqlalchemy.exc import SQLAlchemyError
 
 
 ACTION_CATEGORY_MAP = {
@@ -26,6 +28,8 @@ ACTION_CATEGORY_MAP = {
     "fir.evidence": "fir",
 }
 
+logger = logging.getLogger(__name__)
+
 
 class UserHistoryService:
     def list_history(self, user_id: str, category: str | None = None, limit: int = 50) -> UserHistoryResponse:
@@ -41,6 +45,9 @@ class UserHistoryService:
             if category:
                 items = [item for item in items if item.category == category]
             return UserHistoryResponse(items=items[:limit])
+        except SQLAlchemyError as exc:
+            logger.warning("History lookup failed for user %s: %s", user_id, exc)
+            return UserHistoryResponse(items=[])
         finally:
             session.close()
 
@@ -58,7 +65,7 @@ class UserHistoryService:
             title=title,
             prompt_excerpt=prompt_excerpt,
             result_excerpt=result_excerpt,
-            created_at=row.created_at.isoformat(),
+            created_at=row.created_at.isoformat() if row.created_at else "",
         )
 
     def _load_json(self, raw: str) -> dict:
