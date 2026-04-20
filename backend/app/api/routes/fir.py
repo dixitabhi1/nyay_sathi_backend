@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, File, Form, UploadFile
+from fastapi import HTTPException
 from fastapi.responses import StreamingResponse
 
 from app.core.dependencies import get_audit_service, get_fir_service
@@ -38,9 +39,14 @@ def create_manual_fir(
     current_user: User | None = Depends(get_optional_current_user),
 ) -> FIRRecordResponse:
     payload.user_id = current_user.id if current_user else payload.user_id
-    response = fir_service.create_manual_fir(payload, viewer=current_user)
-    audit_service.log("fir.manual", payload.model_dump(), response.model_dump(), payload.user_id)
-    return response
+    try:
+        response = fir_service.create_manual_fir(payload, viewer=current_user)
+        audit_service.log("fir.manual", payload.model_dump(), response.model_dump(), payload.user_id)
+        return response
+    except HTTPException:
+        raise
+    except Exception:
+        return fir_service.create_manual_fir_failsafe(payload, viewer=current_user)
 
 
 @router.post("/manual/preview", response_model=FIRUploadIntakeResponse)
@@ -83,21 +89,32 @@ async def create_fir_from_upload(
     current_user: User | None = Depends(get_optional_current_user),
 ) -> FIRRecordResponse:
     user_id = current_user.id if current_user else user_id
-    response = await fir_service.create_fir_from_upload(
-        complaint_file,
-        police_station,
-        draft_role=draft_role,
-        draft_language=language,
-        user_id=user_id,
-        viewer=current_user,
-    )
-    audit_service.log(
-        "fir.upload",
-        {"filename": complaint_file.filename, "police_station": police_station},
-        response.model_dump(),
-        user_id,
-    )
-    return response
+    try:
+        response = await fir_service.create_fir_from_upload(
+            complaint_file,
+            police_station,
+            draft_role=draft_role,
+            draft_language=language,
+            user_id=user_id,
+            viewer=current_user,
+        )
+        audit_service.log(
+            "fir.upload",
+            {"filename": complaint_file.filename, "police_station": police_station},
+            response.model_dump(),
+            user_id,
+        )
+        return response
+    except HTTPException:
+        raise
+    except Exception:
+        return await fir_service.create_fir_from_upload_failsafe(
+            complaint_file,
+            police_station,
+            draft_role=draft_role,
+            draft_language=language,
+            viewer=current_user,
+        )
 
 
 @router.post("/voice", response_model=FIRRecordResponse)
@@ -133,14 +150,23 @@ async def create_fir_from_voice(
             language=language,
             user_id=user_id,
         )
-    response = await fir_service.create_fir_from_voice(audio_file=audio_file, payload=payload, viewer=current_user)
-    audit_service.log(
-        "fir.voice",
-        {"filename": getattr(audio_file, "filename", None), "transcript_text": transcript_text},
-        response.model_dump(),
-        user_id,
-    )
-    return response
+    try:
+        response = await fir_service.create_fir_from_voice(audio_file=audio_file, payload=payload, viewer=current_user)
+        audit_service.log(
+            "fir.voice",
+            {"filename": getattr(audio_file, "filename", None), "transcript_text": transcript_text},
+            response.model_dump(),
+            user_id,
+        )
+        return response
+    except HTTPException:
+        raise
+    except Exception:
+        return await fir_service.create_fir_from_voice_failsafe(
+            audio_file=audio_file,
+            payload=payload,
+            viewer=current_user,
+        )
 
 
 @router.post("/voice/preview", response_model=FIRVoiceProcessingResponse)

@@ -143,6 +143,18 @@ class FIRService:
             generated_documents=visible_documents,
         )
 
+    def create_manual_fir_failsafe(self, payload: FIRManualRequest, viewer: User | None = None) -> FIRRecordResponse:
+        preview = self.preview_manual_fir(payload, viewer=viewer)
+        return self._record_response_from_preview(
+            workflow="manual",
+            requested_draft_role=payload.draft_role,
+            draft_language=payload.language,
+            preview=preview,
+            transcript_text=None,
+            source_application_text=None,
+            viewer=viewer,
+        )
+
     async def create_fir_from_upload(
         self,
         complaint_file: UploadFile,
@@ -216,6 +228,31 @@ class FIRService:
             case_strength_reasoning=score_reasons,
             draft_text=draft,
             generated_documents=visible_documents,
+        )
+
+    async def create_fir_from_upload_failsafe(
+        self,
+        complaint_file: UploadFile,
+        police_station: str | None = None,
+        draft_role: str = "citizen_application",
+        draft_language: str = "en",
+        viewer: User | None = None,
+    ) -> FIRRecordResponse:
+        preview = await self.preview_uploaded_complaint(
+            complaint_file,
+            police_station,
+            draft_role=draft_role,
+            draft_language=draft_language,
+            viewer=viewer,
+        )
+        return self._record_response_from_preview(
+            workflow="upload",
+            requested_draft_role=draft_role,
+            draft_language=draft_language,
+            preview=preview,
+            transcript_text=None,
+            source_application_text=preview.cleaned_text,
+            viewer=viewer,
         )
 
     async def create_fir_from_voice(
@@ -320,6 +357,26 @@ class FIRService:
             generated_documents=visible_documents,
             jurisdiction=self.jurisdiction_service.suggest(extracted.incident_location),
             completeness=self.completeness_service.evaluate(extracted),
+        )
+
+    async def create_fir_from_voice_failsafe(
+        self,
+        audio_file: UploadFile | None = None,
+        payload: FIRVoiceTranscriptRequest | None = None,
+        viewer: User | None = None,
+    ) -> FIRRecordResponse:
+        preview = await self.preview_voice_processing(audio_file=audio_file, payload=payload, viewer=viewer)
+        requested_draft_role = payload.draft_role if payload else "citizen_application"
+        draft_language = payload.language if payload else "en"
+        source_application_text = preview.cleaned_text or preview.transcript_text
+        return self._record_response_from_preview(
+            workflow="voice",
+            requested_draft_role=requested_draft_role,
+            draft_language=draft_language,
+            preview=preview,
+            transcript_text=preview.transcript_text,
+            source_application_text=source_application_text,
+            viewer=viewer,
         )
 
     def get_fir_record(self, fir_id: str, user_id: str | None = None, viewer: User | None = None) -> FIRRecordResponse:
@@ -798,6 +855,35 @@ class FIRService:
             evidence_items=[],
             current_version=0,
             last_edited_at=datetime.utcnow().isoformat(),
+        )
+
+    def _record_response_from_preview(
+        self,
+        workflow: str,
+        requested_draft_role: str,
+        draft_language: str,
+        preview: FIRUploadIntakeResponse | FIRVoiceProcessingResponse,
+        transcript_text: str | None,
+        source_application_text: str | None,
+        viewer: User | None,
+    ) -> FIRRecordResponse:
+        score, score_reasons = self._score_fir(preview.extracted_data)
+        return self._build_transient_record_response(
+            workflow=workflow,
+            structured=preview.extracted_data,
+            transcript_text=transcript_text,
+            source_application_text=source_application_text,
+            requested_draft_role=requested_draft_role,
+            draft_language=self._normalize_language(draft_language),
+            sections=preview.sections,
+            comparative_sections=preview.comparative_sections,
+            legal_reasoning=preview.legal_reasoning if hasattr(preview, "legal_reasoning") else "",
+            documents=list(preview.generated_documents),
+            jurisdiction=preview.jurisdiction,
+            completeness=preview.completeness or self.completeness_service.evaluate(preview.extracted_data),
+            score=getattr(preview, "case_strength_score", score),
+            score_reasons=getattr(preview, "case_strength_reasoning", score_reasons),
+            viewer=viewer,
         )
 
     def _prepare_documents_for_viewer(
