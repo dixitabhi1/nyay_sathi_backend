@@ -1,6 +1,6 @@
 import { createContext, ReactNode, useContext, useEffect, useMemo, useState } from "react";
 
-import { api, getApiAuthToken, setApiAuthToken } from "../services/api";
+import { api, getApiAuthToken, setApiAuthToken, setApiUnauthorizedHandler } from "../services/api";
 
 type AuthUser = {
   id: string;
@@ -55,6 +55,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     void refresh();
+  }, []);
+
+  useEffect(() => {
+    setApiUnauthorizedHandler(() => {
+      setApiAuthToken(null);
+      setUser(null);
+      setLoading(false);
+    });
+    return () => {
+      setApiUnauthorizedHandler(null);
+    };
   }, []);
 
   async function applyAuthResponse(response: AuthTokenResponse) {

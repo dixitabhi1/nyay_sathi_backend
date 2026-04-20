@@ -6,6 +6,7 @@ const UPLOAD_REQUEST_TIMEOUT_MS = 45000;
 
 let authToken: string | null =
   typeof window !== "undefined" ? window.localStorage.getItem(AUTH_TOKEN_STORAGE_KEY) : null;
+let unauthorizedHandler: (() => void) | null = null;
 
 type RequestMethod = "GET" | "POST" | "PUT";
 type RequestOptions = {
@@ -51,6 +52,10 @@ async function requestJson<T>(path: string, method: RequestMethod, payload?: unk
   }, options.timeoutMs ?? DEFAULT_REQUEST_TIMEOUT_MS);
 
   if (!response.ok) {
+    if (response.status === 401 && path !== "/auth/login" && path !== "/auth/register") {
+      setApiAuthToken(null);
+      unauthorizedHandler?.();
+    }
     throw new Error(await extractError(response));
   }
 
@@ -101,6 +106,10 @@ export function setApiAuthToken(token: string | null) {
 
 export function getApiAuthToken() {
   return authToken;
+}
+
+export function setApiUnauthorizedHandler(handler: (() => void) | null) {
+  unauthorizedHandler = handler;
 }
 
 export const api = {

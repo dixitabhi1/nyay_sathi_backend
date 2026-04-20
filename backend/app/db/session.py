@@ -1,6 +1,7 @@
 from collections.abc import Generator
 from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeoutError
 import logging
+import time
 import threading
 
 from sqlalchemy import create_engine, inspect, text
@@ -38,27 +39,33 @@ def _ping_engine(candidate_engine) -> None:
 
 
 def _engine_responds(candidate_engine) -> bool:
-    executor = ThreadPoolExecutor(max_workers=1)
-    future = executor.submit(_ping_engine, candidate_engine)
-    try:
-        future.result(timeout=settings.database_probe_timeout_seconds)
-        executor.shutdown(wait=False, cancel_futures=True)
-        return True
-    except FuturesTimeoutError:
-        logger.warning(
-            "Database probe exceeded %.1fs. Falling back to local SQLite.",
-            settings.database_probe_timeout_seconds,
-        )
-        executor.shutdown(wait=False, cancel_futures=True)
-        return False
-    except SQLAlchemyError as exc:
-        logger.warning("Database probe failed: %s. Falling back to local SQLite.", exc)
-        executor.shutdown(wait=False, cancel_futures=True)
-        return False
-    except Exception as exc:  # pragma: no cover - defensive fallback for hosted DB drivers
-        logger.warning("Unexpected database probe failure: %s. Falling back to local SQLite.", exc)
-        executor.shutdown(wait=False, cancel_futures=True)
-        return False
+    attempts = 3 if settings.is_huggingface_space else 2
+    for attempt in range(1, attempts + 1):
+        executor = ThreadPoolExecutor(max_workers=1)
+        future = executor.submit(_ping_engine, candidate_engine)
+        try:
+            future.result(timeout=settings.database_probe_timeout_seconds)
+            executor.shutdown(wait=False, cancel_futures=True)
+            return True
+        except FuturesTimeoutError:
+            logger.warning(
+                "Database probe attempt %s/%s exceeded %.1fs.",
+                attempt,
+                attempts,
+                settings.database_probe_timeout_seconds,
+            )
+        except SQLAlchemyError as exc:
+            logger.warning("Database probe attempt %s/%s failed: %s", attempt, attempts, exc)
+        except Exception as exc:  # pragma: no cover - defensive fallback for hosted DB drivers
+            logger.warning("Unexpected database probe attempt %s/%s failure: %s", attempt, attempts, exc)
+        finally:
+            executor.shutdown(wait=False, cancel_futures=True)
+
+        if attempt < attempts:
+            time.sleep(0.35 * attempt)
+
+    logger.warning("All database probe attempts failed. Falling back to local SQLite.")
+    return False
 
 
 try:
