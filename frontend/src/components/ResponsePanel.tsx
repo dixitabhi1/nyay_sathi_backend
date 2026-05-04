@@ -7,6 +7,10 @@ type SourceDocument = {
   source_type: string;
   score: number;
   source_url?: string | null;
+  reference_path?: string | null;
+  retrieval_mode?: string | null;
+  confidence?: number | null;
+  metadata: Record<string, string>;
 };
 
 type ChatResponse = {
@@ -111,7 +115,22 @@ function asSources(value: unknown): SourceDocument[] {
     source_type: typeof item.source_type === "string" ? item.source_type : "source",
     score: typeof item.score === "number" ? item.score : 0,
     source_url: typeof item.source_url === "string" ? item.source_url : null,
+    reference_path: typeof item.reference_path === "string" ? item.reference_path : null,
+    retrieval_mode: typeof item.retrieval_mode === "string" ? item.retrieval_mode : null,
+    confidence: typeof item.confidence === "number" ? item.confidence : null,
+    metadata: asMetadata(item.metadata),
   }));
+}
+
+function asMetadata(value: unknown): Record<string, string> {
+  if (!isRecord(value)) {
+    return {};
+  }
+  return Object.fromEntries(
+    Object.entries(value)
+      .filter(([, entry]) => entry !== null && entry !== undefined && String(entry).trim() !== "")
+      .map(([key, entry]) => [key, String(entry)]),
+  );
 }
 
 function buildDownloadText(module: ModuleKey, content: unknown): string {
@@ -131,7 +150,12 @@ function buildDownloadText(module: ModuleKey, content: unknown): string {
       item.scope_warning ? `Warning: ${item.scope_warning}` : "",
       "",
       "Sources:",
-      ...sources.map((source) => `- ${source.citation}: ${source.excerpt}${source.source_url ? ` (${source.source_url})` : ""}`),
+      ...sources.map((source) =>
+        [
+          `- ${source.citation}: ${source.excerpt}${source.source_url ? ` (${source.source_url})` : ""}`,
+          ...Object.entries(source.metadata).map(([key, value]) => `  ${key}: ${value}`),
+        ].join("\n"),
+      ),
       "",
       `Disclaimer: ${item.disclaimer ?? ""}`,
     ]
@@ -171,7 +195,9 @@ function buildDownloadText(module: ModuleKey, content: unknown): string {
       ...cases.map((result) => `- ${result.case_title} (${result.court}, ${result.similarity_score}): ${result.verdict} ${result.source_link}`),
       "",
       "Retrieved sources:",
-      ...asSources(item.hits).map((hit) => `- ${hit.citation}: ${hit.excerpt}`),
+      ...asSources(item.hits).map((hit) =>
+        [`- ${hit.citation}: ${hit.excerpt}`, ...Object.entries(hit.metadata).map(([key, value]) => `  ${key}: ${value}`)].join("\n"),
+      ),
     ].filter(Boolean).join("\n");
   }
 
@@ -248,6 +274,24 @@ function downloadPreview(module: ModuleKey, content: unknown) {
   URL.revokeObjectURL(url);
 }
 
+function renderMetadata(metadata: Record<string, string>) {
+  const entries = Object.entries(metadata);
+  if (entries.length === 0) {
+    return null;
+  }
+
+  return (
+    <dl className="source-metadata">
+      {entries.map(([key, value]) => (
+        <div key={key}>
+          <dt>{key.replace(/_/g, " ")}</dt>
+          <dd>{value}</dd>
+        </div>
+      ))}
+    </dl>
+  );
+}
+
 function renderSources(label: string, sources: SourceDocument[]) {
   if (!sources.length) {
     return null;
@@ -274,6 +318,7 @@ function renderSources(label: string, sources: SourceDocument[]) {
             </div>
             <p className="source-title">{source.title}</p>
             <p>{source.excerpt}</p>
+            {renderMetadata(source.metadata)}
             {source.source_url && (
               <p className="source-link-row">
                 <a href={source.source_url} target="_blank" rel="noopener noreferrer">

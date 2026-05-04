@@ -531,6 +531,39 @@ button {
   font-weight: 700;
 }
 
+.source-metadata {
+  display: grid;
+  gap: 8px;
+  margin: 14px 0 0;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+}
+
+.source-metadata div {
+  display: grid;
+  grid-template-columns: minmax(120px, 0.36fr) 1fr;
+  gap: 10px;
+}
+
+.source-metadata dt,
+.source-metadata dd {
+  margin: 0;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.source-metadata dt {
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 800;
+  text-transform: capitalize;
+}
+
+.source-metadata dd {
+  color: var(--copy);
+  white-space: pre-wrap;
+}
+
 .clean-list,
 .section-list,
 .rationale-list,
@@ -873,5 +906,10 @@ button {
   .panel-actions {
     align-items: flex-start;
     flex-direction: column;
+  }
+
+  .source-metadata div {
+    grid-template-columns: 1fr;
+    gap: 4px;
   }
 }

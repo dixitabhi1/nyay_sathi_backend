@@ -217,13 +217,7 @@ class LegalSectionClassifier:
         statute_code: str,
         confidence: float,
     ) -> FIRSectionSuggestion:
-        fallback = str(rule[statute_code.lower()])
-        resolved = self._resolve_section_label(
-            description,
-            fallback,
-            preferred_title=rule["title_hint"],
-            statute_code=statute_code,
-        )
+        resolved = str(rule[statute_code.lower()])
         return FIRSectionSuggestion(
             statute_code=statute_code,
             section=resolved,

@@ -513,25 +513,25 @@ class LegalEngine:
         metadata: dict[str, str] = {}
         raw_metadata = item.get("metadata")
         if isinstance(raw_metadata, dict):
-            metadata.update({str(key): str(value) for key, value in raw_metadata.items() if value is not None})
-        for key in (
-            "case_title",
-            "court",
-            "parties",
-            "decision_date",
-            "case_number",
-            "verdict",
-            "bench",
-            "cnr",
-            "dataset",
-            "dataset_registry",
-            "source_pdf",
-            "accessed_on",
-        ):
-            value = item.get(key)
-            if value is not None and str(value).strip():
-                metadata[key] = str(value).strip()
+            for key, value in raw_metadata.items():
+                normalized = self._metadata_value_to_string(value)
+                if normalized:
+                    metadata[str(key)] = normalized
+        for key, value in item.items():
+            if key in {"metadata", "text"}:
+                continue
+            normalized = self._metadata_value_to_string(value)
+            if normalized:
+                metadata[str(key)] = normalized
         return metadata
+
+    def _metadata_value_to_string(self, value: object) -> str:
+        if value is None:
+            return ""
+        if isinstance(value, (list, dict)):
+            return json.dumps(value, ensure_ascii=False)
+        normalized = str(value).strip()
+        return normalized
 
     def _format_sources_for_prompt(self, sources: list[SourceDocument]) -> str:
         formatted: list[str] = []
