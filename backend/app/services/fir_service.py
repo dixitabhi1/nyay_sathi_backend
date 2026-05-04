@@ -74,7 +74,7 @@ class FIRService:
         self.crime_pattern_service = crime_pattern_service
 
     def create_manual_fir(self, payload: FIRManualRequest, viewer: User | None = None) -> FIRRecordResponse:
-        self._ensure_document_kind_access(payload.draft_role, viewer)
+        draft_role = self._intake_document_kind_for_viewer(payload.draft_role, viewer)
         structured = FIRStructuredData(
             complainant_name=payload.complainant_name,
             parent_name=payload.parent_name,
@@ -94,14 +94,14 @@ class FIRService:
             structured=structured,
             transcript_text=None,
             user_id=payload.user_id,
-            draft_role=payload.draft_role,
+            draft_role=draft_role,
             draft_language=payload.language,
             source_application_text=None,
             viewer=viewer,
         )
 
     def preview_manual_fir(self, payload: FIRManualRequest, viewer: User | None = None) -> FIRUploadIntakeResponse:
-        self._ensure_document_kind_access(payload.draft_role, viewer)
+        draft_role = self._intake_document_kind_for_viewer(payload.draft_role, viewer)
         structured = FIRStructuredData(
             complainant_name=payload.complainant_name,
             parent_name=payload.parent_name,
@@ -127,7 +127,7 @@ class FIRService:
             language=payload.language,
             source_application_text=None,
         )
-        _, draft, visible_documents = self._prepare_documents_for_viewer(documents, payload.draft_role, viewer)
+        _, draft, visible_documents = self._prepare_documents_for_viewer(documents, draft_role, viewer)
         return FIRUploadIntakeResponse(
             extracted_data=structured,
             transcript_text=None,
@@ -147,7 +147,7 @@ class FIRService:
         preview = self.preview_manual_fir(payload, viewer=viewer)
         return self._record_response_from_preview(
             workflow="manual",
-            requested_draft_role=payload.draft_role,
+            requested_draft_role=self._intake_document_kind_for_viewer(payload.draft_role, viewer),
             draft_language=payload.language,
             preview=preview,
             transcript_text=None,
@@ -164,7 +164,7 @@ class FIRService:
         user_id: str | None = None,
         viewer: User | None = None,
     ) -> FIRRecordResponse:
-        self._ensure_document_kind_access(draft_role, viewer)
+        draft_role = self._intake_document_kind_for_viewer(draft_role, viewer)
         content = await self.document_ingestion.read_upload_bytes(complaint_file)
         saved_path = await self.document_ingestion.save_upload(complaint_file, content=content)
         extracted_text = await self.document_ingestion.extract_text(complaint_file, content=content)
@@ -182,6 +182,8 @@ class FIRService:
             source_application_text=extracted_text,
             viewer=viewer,
         )
+        if response.status == "generated_not_saved" or not response.fir_id:
+            return response
         self._attach_saved_evidence(
             response.fir_id,
             complaint_file.filename or Path(saved_path).name,
@@ -198,7 +200,7 @@ class FIRService:
         draft_language: str = "en",
         viewer: User | None = None,
     ) -> FIRUploadIntakeResponse:
-        self._ensure_document_kind_access(draft_role, viewer)
+        draft_role = self._intake_document_kind_for_viewer(draft_role, viewer)
         content = await self.document_ingestion.read_upload_bytes(complaint_file)
         extracted_text = await self.document_ingestion.extract_text(complaint_file, content=content)
         cleaned_text = self.extraction_service.clean_text(extracted_text)
@@ -247,7 +249,7 @@ class FIRService:
         )
         return self._record_response_from_preview(
             workflow="upload",
-            requested_draft_role=draft_role,
+            requested_draft_role=self._intake_document_kind_for_viewer(draft_role, viewer),
             draft_language=draft_language,
             preview=preview,
             transcript_text=None,
@@ -262,13 +264,12 @@ class FIRService:
         viewer: User | None = None,
     ) -> FIRRecordResponse:
         requested_kind = payload.draft_role if payload else "citizen_application"
-        self._ensure_document_kind_access(requested_kind, viewer)
+        draft_role = self._intake_document_kind_for_viewer(requested_kind, viewer)
         defaults = {
             "police_station": payload.police_station if payload else None,
             "complainant_name": payload.complainant_name if payload else None,
         }
         user_id = payload.user_id if payload else None
-        draft_role = payload.draft_role if payload else "citizen_application"
         draft_language = payload.language if payload else "en"
         transcript_candidate = self.extraction_service.clean_text(payload.transcript_text) if payload else ""
 
@@ -305,6 +306,8 @@ class FIRService:
             source_application_text=transcript_text,
             viewer=viewer,
         )
+        if response.status == "generated_not_saved" or not response.fir_id:
+            return response
         if saved_audio_path and saved_audio_name and saved_audio_media_type:
             self._attach_saved_evidence(
                 response.fir_id,
@@ -320,8 +323,10 @@ class FIRService:
         payload: FIRVoiceTranscriptRequest | None = None,
         viewer: User | None = None,
     ) -> FIRVoiceProcessingResponse:
-        requested_kind = payload.draft_role if payload else "citizen_application"
-        self._ensure_document_kind_access(requested_kind, viewer)
+        requested_kind = self._intake_document_kind_for_viewer(
+            payload.draft_role if payload else "citizen_application",
+            viewer,
+        )
         defaults = {
             "police_station": payload.police_station if payload else None,
             "complainant_name": payload.complainant_name if payload else None,
@@ -366,7 +371,10 @@ class FIRService:
         viewer: User | None = None,
     ) -> FIRRecordResponse:
         preview = await self.preview_voice_processing(audio_file=audio_file, payload=payload, viewer=viewer)
-        requested_draft_role = payload.draft_role if payload else "citizen_application"
+        requested_draft_role = self._intake_document_kind_for_viewer(
+            payload.draft_role if payload else "citizen_application",
+            viewer,
+        )
         draft_language = payload.language if payload else "en"
         source_application_text = preview.cleaned_text or preview.transcript_text
         return self._record_response_from_preview(
@@ -943,6 +951,12 @@ class FIRService:
                 status_code=403,
                 detail="You do not have access to this FIR document track.",
             )
+
+    def _intake_document_kind_for_viewer(self, document_kind: str, viewer: User | None) -> str:
+        normalized = self._normalize_document_kind(document_kind)
+        if normalized in self._allowed_document_kinds_for_viewer(viewer):
+            return normalized
+        return "citizen_application"
 
     def _is_admin_viewer(self, viewer: User) -> bool:
         return viewer.email.strip().lower() in self.settings.admin_email_allowlist or (
