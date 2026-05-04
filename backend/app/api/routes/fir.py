@@ -41,7 +41,8 @@ def create_manual_fir(
     payload.user_id = current_user.id if current_user else payload.user_id
     try:
         response = fir_service.create_manual_fir(payload, viewer=current_user)
-        audit_service.log("fir.manual", payload.model_dump(), response.model_dump(), payload.user_id)
+        if response.status != "generated_not_saved":
+            audit_service.log("fir.manual", payload.model_dump(), response.model_dump(), payload.user_id)
         return response
     except HTTPException:
         raise
@@ -98,12 +99,13 @@ async def create_fir_from_upload(
             user_id=user_id,
             viewer=current_user,
         )
-        audit_service.log(
-            "fir.upload",
-            {"filename": complaint_file.filename, "police_station": police_station},
-            response.model_dump(),
-            user_id,
-        )
+        if response.status != "generated_not_saved":
+            audit_service.log(
+                "fir.upload",
+                {"filename": complaint_file.filename, "police_station": police_station},
+                response.model_dump(),
+                user_id,
+            )
         return response
     except HTTPException:
         raise
@@ -152,12 +154,13 @@ async def create_fir_from_voice(
         )
     try:
         response = await fir_service.create_fir_from_voice(audio_file=audio_file, payload=payload, viewer=current_user)
-        audit_service.log(
-            "fir.voice",
-            {"filename": getattr(audio_file, "filename", None), "transcript_text": transcript_text},
-            response.model_dump(),
-            user_id,
-        )
+        if response.status != "generated_not_saved":
+            audit_service.log(
+                "fir.voice",
+                {"filename": getattr(audio_file, "filename", None), "transcript_text": transcript_text},
+                response.model_dump(),
+                user_id,
+            )
         return response
     except HTTPException:
         raise

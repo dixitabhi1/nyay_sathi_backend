@@ -604,6 +604,25 @@ class FIRService:
             source_application_text=source_application_text,
         )
         draft_text = self._select_document_content(documents, normalized_draft_role)
+        if self._should_skip_blocking_fir_persistence():
+            logger.warning("Skipping blocking FIR persistence on Space remote DB; returning generated draft.")
+            return self._build_transient_record_response(
+                workflow=workflow,
+                structured=structured,
+                transcript_text=transcript_text,
+                source_application_text=source_application_text,
+                requested_draft_role=normalized_draft_role,
+                draft_language=normalized_language,
+                sections=sections,
+                comparative_sections=comparative_sections,
+                legal_reasoning=legal_reasoning,
+                documents=documents,
+                jurisdiction=jurisdiction,
+                completeness=completeness,
+                score=score,
+                score_reasons=score_reasons,
+                viewer=viewer,
+            )
         for attempt in range(2):
             now = datetime.utcnow()
             record = FIRRecord(
@@ -1004,3 +1023,10 @@ class FIRService:
             reasons.append("Accused information is available.")
         score = max(0, min(score, 100))
         return score, reasons
+
+    def _should_skip_blocking_fir_persistence(self) -> bool:
+        return (
+            self.settings.is_huggingface_space
+            and self.settings.resolved_database_url.startswith("sqlite+libsql://")
+            and self.settings.space_local_app_db_fallback_reason is None
+        )
